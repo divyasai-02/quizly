@@ -16,4 +16,5 @@ output/playwright
 playwright-report
 test-results
 
-.DS_Store
+.DS_Storetsconfig.tsbuildinfo
+.playwright-cli
