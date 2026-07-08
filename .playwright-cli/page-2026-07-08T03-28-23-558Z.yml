@@ -1,0 +1,252 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - link "Quizly" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard
+      - img [ref=e5]
+      - text: Quizly
+    - generic [ref=e11]:
+      - generic [ref=e12]: PJ
+      - generic [ref=e13]:
+        - strong [ref=e14]: Prof. John Doe
+        - generic [ref=e15]: Computer Science
+    - navigation [ref=e16]:
+      - link "Dashboard" [ref=e17] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e18]
+        - text: Dashboard
+      - link "Classes" [ref=e21] [cursor=pointer]:
+        - /url: /classes
+        - img [ref=e22]
+        - text: Classes
+      - link "My Quizzes" [ref=e25] [cursor=pointer]:
+        - /url: /dashboard#quizzes
+        - img [ref=e26]
+        - text: My Quizzes
+      - link "Create Quiz" [ref=e28] [cursor=pointer]:
+        - /url: /create-quiz
+        - img [ref=e29]
+        - text: Create Quiz
+      - link "Leaderboards" [ref=e31] [cursor=pointer]:
+        - /url: /leaderboard
+        - img [ref=e32]
+        - text: Leaderboards
+      - link "Analytics" [ref=e38] [cursor=pointer]:
+        - /url: /analytics
+        - img [ref=e39]
+        - text: Analytics
+      - link "Question Bank" [ref=e41] [cursor=pointer]:
+        - /url: /question-bank
+        - img [ref=e42]
+        - text: Question Bank
+      - link "Settings" [ref=e45] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e46]
+        - text: Settings
+      - generic [ref=e49]:
+        - link "Help & Support" [ref=e50] [cursor=pointer]:
+          - /url: /help
+          - img [ref=e51]
+          - text: Help & Support
+        - link "Logout" [ref=e54] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e55]
+          - text: Logout
+  - main [ref=e58]:
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - heading "Leaderboard" [level=1] [ref=e61]
+        - paragraph [ref=e62]: Compete, learn and climb the ranks!
+      - generic [ref=e63]:
+        - img [ref=e64]
+        - textbox [ref=e67]:
+          - /placeholder: Search quizzes, classes...
+      - button "Notifications" [ref=e68] [cursor=pointer]:
+        - img [ref=e69]
+        - generic [ref=e72]: "3"
+      - generic [ref=e73]: P
+    - generic [ref=e74]:
+      - generic [ref=e76]:
+        - combobox [ref=e77]:
+          - option "JavaScript Basics Quiz" [selected]
+        - combobox [ref=e78]:
+          - option "This Week" [selected]
+        - button "Global" [ref=e79] [cursor=pointer]
+        - button "Friends" [ref=e80] [cursor=pointer]
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - generic [ref=e83]: "#2"
+          - generic [ref=e84]: DS
+          - heading "Diya Sharma" [level=2] [ref=e85]
+          - generic [ref=e86]: Logic Legend
+          - strong [ref=e87]: 8,610 XP
+        - generic [ref=e88]:
+          - generic [ref=e89]: "#1"
+          - generic [ref=e90]: AM
+          - heading "Arjun Mehta" [level=2] [ref=e91]
+          - generic [ref=e92]: Code Master
+          - strong [ref=e93]: 9,850 XP
+        - generic [ref=e94]:
+          - generic [ref=e95]: "#3"
+          - generic [ref=e96]: RV
+          - heading "Rohit Verma" [level=2] [ref=e97]
+          - generic [ref=e98]: Quick Thinker
+          - strong [ref=e99]: 7,420 XP
+      - generic [ref=e100]:
+        - table [ref=e101]:
+          - rowgroup [ref=e102]:
+            - row "Rank Learner Score Accuracy Streak" [ref=e103]:
+              - columnheader "Rank" [ref=e104]
+              - columnheader "Learner" [ref=e105]
+              - columnheader "Score" [ref=e106]
+              - columnheader "Accuracy" [ref=e107]
+              - columnheader "Streak" [ref=e108]
+          - rowgroup [ref=e109]:
+            - row "4 SI Sneha Iyer Problem Solver 6,250 XP 92% 12" [ref=e110]:
+              - cell "4" [ref=e111]:
+                - strong [ref=e112]: "4"
+              - cell "SI Sneha Iyer Problem Solver" [ref=e113]:
+                - generic [ref=e114]:
+                  - generic [ref=e115]: SI
+                  - generic [ref=e116]:
+                    - strong [ref=e117]: Sneha Iyer
+                    - generic [ref=e118]: Problem Solver
+              - cell "6,250 XP" [ref=e119]:
+                - strong [ref=e120]: 6,250 XP
+              - cell "92%" [ref=e121]:
+                - strong [ref=e122]: 92%
+              - cell "12" [ref=e125]:
+                - strong [ref=e126]:
+                  - text: "12"
+                  - img [ref=e127]
+            - row "5 KP Karan Patel Quiz Wizard 5,980 XP 89% 9" [ref=e129]:
+              - cell "5" [ref=e130]:
+                - strong [ref=e131]: "5"
+              - cell "KP Karan Patel Quiz Wizard" [ref=e132]:
+                - generic [ref=e133]:
+                  - generic [ref=e134]: KP
+                  - generic [ref=e135]:
+                    - strong [ref=e136]: Karan Patel
+                    - generic [ref=e137]: Quiz Wizard
+              - cell "5,980 XP" [ref=e138]:
+                - strong [ref=e139]: 5,980 XP
+              - cell "89%" [ref=e140]:
+                - strong [ref=e141]: 89%
+              - cell "9" [ref=e144]:
+                - strong [ref=e145]:
+                  - text: "9"
+                  - img [ref=e146]
+            - row "6 AJ Ananya Joshi Brainiac 5,210 XP 86% 7" [ref=e148]:
+              - cell "6" [ref=e149]:
+                - strong [ref=e150]: "6"
+              - cell "AJ Ananya Joshi Brainiac" [ref=e151]:
+                - generic [ref=e152]:
+                  - generic [ref=e153]: AJ
+                  - generic [ref=e154]:
+                    - strong [ref=e155]: Ananya Joshi
+                    - generic [ref=e156]: Brainiac
+              - cell "5,210 XP" [ref=e157]:
+                - strong [ref=e158]: 5,210 XP
+              - cell "86%" [ref=e159]:
+                - strong [ref=e160]: 86%
+              - cell "7" [ref=e163]:
+                - strong [ref=e164]:
+                  - text: "7"
+                  - img [ref=e165]
+            - row "7 AM Arjun Mehta (You) Code Explorer 4,850 XP 82% 6" [ref=e167]:
+              - cell "7" [ref=e168]:
+                - strong [ref=e169]: "7"
+              - cell "AM Arjun Mehta (You) Code Explorer" [ref=e170]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]: AM
+                  - generic [ref=e173]:
+                    - strong [ref=e174]: Arjun Mehta (You)
+                    - generic [ref=e175]: Code Explorer
+              - cell "4,850 XP" [ref=e176]:
+                - strong [ref=e177]: 4,850 XP
+              - cell "82%" [ref=e178]:
+                - strong [ref=e179]: 82%
+              - cell "6" [ref=e182]:
+                - strong [ref=e183]:
+                  - text: "6"
+                  - img [ref=e184]
+            - row "8 AS Aditya Singh Consistent 4,120 XP 78% 5" [ref=e186]:
+              - cell "8" [ref=e187]:
+                - strong [ref=e188]: "8"
+              - cell "AS Aditya Singh Consistent" [ref=e189]:
+                - generic [ref=e190]:
+                  - generic [ref=e191]: AS
+                  - generic [ref=e192]:
+                    - strong [ref=e193]: Aditya Singh
+                    - generic [ref=e194]: Consistent
+              - cell "4,120 XP" [ref=e195]:
+                - strong [ref=e196]: 4,120 XP
+              - cell "78%" [ref=e197]:
+                - strong [ref=e198]: 78%
+              - cell "5" [ref=e201]:
+                - strong [ref=e202]:
+                  - text: "5"
+                  - img [ref=e203]
+            - row "9 MN Meera Nair Concept King 3,750 XP 75% 4" [ref=e205]:
+              - cell "9" [ref=e206]:
+                - strong [ref=e207]: "9"
+              - cell "MN Meera Nair Concept King" [ref=e208]:
+                - generic [ref=e209]:
+                  - generic [ref=e210]: MN
+                  - generic [ref=e211]:
+                    - strong [ref=e212]: Meera Nair
+                    - generic [ref=e213]: Concept King
+              - cell "3,750 XP" [ref=e214]:
+                - strong [ref=e215]: 3,750 XP
+              - cell "75%" [ref=e216]:
+                - strong [ref=e217]: 75%
+              - cell "4" [ref=e220]:
+                - strong [ref=e221]:
+                  - text: "4"
+                  - img [ref=e222]
+            - row "10 VG Vivaan Gupta Rising Star 3,210 XP 72% 3" [ref=e224]:
+              - cell "10" [ref=e225]:
+                - strong [ref=e226]: "10"
+              - cell "VG Vivaan Gupta Rising Star" [ref=e227]:
+                - generic [ref=e228]:
+                  - generic [ref=e229]: VG
+                  - generic [ref=e230]:
+                    - strong [ref=e231]: Vivaan Gupta
+                    - generic [ref=e232]: Rising Star
+              - cell "3,210 XP" [ref=e233]:
+                - strong [ref=e234]: 3,210 XP
+              - cell "72%" [ref=e235]:
+                - strong [ref=e236]: 72%
+              - cell "3" [ref=e239]:
+                - strong [ref=e240]:
+                  - text: "3"
+                  - img [ref=e241]
+        - button "View Full Leaderboard" [ref=e244] [cursor=pointer]
+      - generic [ref=e245]:
+        - heading "Your Performance Overview" [level=3] [ref=e246]
+        - generic [ref=e247]:
+          - generic [ref=e248]:
+            - img [ref=e249]
+            - paragraph [ref=e255]: Your Rank
+            - strong [ref=e256]: "7"
+            - paragraph [ref=e257]: Out of 1024
+          - generic [ref=e258]:
+            - img [ref=e259]
+            - paragraph [ref=e261]: Total XP
+            - strong [ref=e262]: 4,850
+            - paragraph [ref=e263]: Keep it up!
+          - generic [ref=e264]:
+            - img [ref=e265]
+            - paragraph [ref=e269]: Accuracy
+            - strong [ref=e270]: 82%
+            - paragraph [ref=e271]: Great job!
+          - generic [ref=e272]:
+            - img [ref=e273]
+            - paragraph [ref=e275]: Best Streak
+            - strong [ref=e276]: 6 Days
+            - paragraph [ref=e277]: Keep it going!
+        - generic [ref=e278]:
+          - img [ref=e279]
+          - strong [ref=e285]: You are in the top 1% of this leaderboard
+          - button "Share Rank" [ref=e286] [cursor=pointer]:
+            - img [ref=e287]
+            - text: Share Rank

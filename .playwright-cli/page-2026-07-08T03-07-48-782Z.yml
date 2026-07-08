@@ -1,0 +1,46 @@
+- generic [ref=e1]:
+  - alert [ref=e85]
+  - main [ref=e86]:
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - link [ref=e89] [cursor=pointer]:
+          - /url: /quiz/javascript-basics/instructions
+          - img [ref=e90]
+        - strong [ref=e92]: JavaScript Basics Quiz
+        - img [ref=e93]
+        - strong [ref=e96]: 13:17
+        - img [ref=e97]
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - generic [ref=e103]: Question 4 of 4
+          - generic [ref=e106]:
+            - heading "What is the purpose of the use strict directive in JavaScript?" [level=2] [ref=e176]
+            - generic [ref=e108]:
+              - button "Adds CSS" [ref=e177] [cursor=pointer]: Adds CSS
+              - button "Enables stricter parsing" [ref=e179] [cursor=pointer]: Enables stricter parsing
+              - button "Creates arrays" [ref=e181] [cursor=pointer]: Creates arrays
+              - button "Runs code faster only" [ref=e183] [cursor=pointer]: Runs code faster only
+            - generic [ref=e117]:
+              - generic [ref=e118]:
+                - checkbox "Mark for review" [ref=e119]
+                - text: Mark for review
+              - img [ref=e120]
+        - complementary [ref=e122]:
+          - heading "Question Navigator" [level=3] [ref=e123]
+          - paragraph [ref=e124]: Answered
+          - paragraph [ref=e126]: Not Answered
+          - paragraph [ref=e128]: Marked for Review
+          - generic [ref=e130]:
+            - button "1" [ref=e131] [cursor=pointer]
+            - button "2" [ref=e132] [cursor=pointer]
+            - button "3" [ref=e133] [cursor=pointer]
+            - button "4" [ref=e134] [cursor=pointer]
+          - button "Review Later" [ref=e151] [cursor=pointer]:
+            - img [ref=e152]
+            - text: Review Later
+      - generic [ref=e154]:
+        - button "Previous" [ref=e155] [cursor=pointer]
+        - button "Clear Answer" [ref=e156] [cursor=pointer]:
+          - img [ref=e157]
+          - text: Clear Answer
+        - button "Submit Quiz" [active] [ref=e185] [cursor=pointer]

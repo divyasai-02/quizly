@@ -1,0 +1,255 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "Quizly" [ref=e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e5]
+        - text: Quizly
+      - generic [ref=e11]:
+        - generic [ref=e12]: PJ
+        - generic [ref=e13]:
+          - strong [ref=e14]: Prof. John Doe
+          - generic [ref=e15]: Computer Science
+      - navigation [ref=e16]:
+        - link "Dashboard" [ref=e17] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e18]
+          - text: Dashboard
+        - link "Classes" [ref=e21] [cursor=pointer]:
+          - /url: /classes
+          - img [ref=e22]
+          - text: Classes
+        - link "My Quizzes" [ref=e25] [cursor=pointer]:
+          - /url: /dashboard#quizzes
+          - img [ref=e26]
+          - text: My Quizzes
+        - link "Create Quiz" [ref=e28] [cursor=pointer]:
+          - /url: /create-quiz
+          - img [ref=e29]
+          - text: Create Quiz
+        - link "Leaderboards" [ref=e31] [cursor=pointer]:
+          - /url: /leaderboard
+          - img [ref=e32]
+          - text: Leaderboards
+        - link "Analytics" [ref=e38] [cursor=pointer]:
+          - /url: /analytics
+          - img [ref=e39]
+          - text: Analytics
+        - link "Question Bank" [ref=e41] [cursor=pointer]:
+          - /url: /question-bank
+          - img [ref=e42]
+          - text: Question Bank
+        - link "Settings" [ref=e45] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e46]
+          - text: Settings
+        - generic [ref=e49]:
+          - link "Help & Support" [ref=e50] [cursor=pointer]:
+            - /url: /help
+            - img [ref=e51]
+            - text: Help & Support
+          - link "Logout" [ref=e54] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e55]
+            - text: Logout
+    - main [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - heading "Create New Quiz" [level=1] [ref=e61]
+          - paragraph [ref=e62]: Build and publish a polished quiz.
+        - generic [ref=e63]:
+          - img [ref=e64]
+          - textbox [ref=e67]:
+            - /placeholder: Search quizzes, classes...
+        - button "Notifications" [ref=e68] [cursor=pointer]:
+          - img [ref=e69]
+          - generic [ref=e72]: "3"
+        - generic [ref=e73]: P
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - generic [ref=e76]: "1"
+          - generic [ref=e77]:
+            - strong [ref=e78]: Details
+            - text: Quiz information
+        - generic [ref=e79]:
+          - generic [ref=e80]: "2"
+          - generic [ref=e81]:
+            - strong [ref=e82]: Questions
+            - text: Add questions
+        - generic [ref=e83]:
+          - generic [ref=e84]: "3"
+          - generic [ref=e85]:
+            - strong [ref=e86]: Settings
+            - text: Quiz settings
+        - generic [ref=e87]:
+          - generic [ref=e88]: "4"
+          - generic [ref=e89]:
+            - strong [ref=e90]: Publish
+            - text: Review & publish
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - heading "Questions (6)" [level=3] [ref=e270]
+            - button "Add question" [ref=e95] [cursor=pointer]:
+              - img [ref=e96]
+          - button "1 What is the output of console.log(typeof []) in JavaScript? MCQ - 1 Mark" [ref=e271] [cursor=pointer]:
+            - strong [ref=e272]: "1"
+            - generic [ref=e273]:
+              - strong [ref=e274]: What is the output of console.log(typeof []) in JavaScript?
+              - generic [ref=e275]: MCQ - 1 Mark
+            - img [ref=e276]
+          - button "2 Which company developed JavaScript? MCQ - 1 Mark" [ref=e280] [cursor=pointer]:
+            - strong [ref=e281]: "2"
+            - generic [ref=e282]:
+              - strong [ref=e283]: Which company developed JavaScript?
+              - generic [ref=e284]: MCQ - 1 Mark
+            - img [ref=e285]
+          - button "3 What is the correct way to declare a variable in modern JavaScript? MCQ - 1 Mark" [ref=e289] [cursor=pointer]:
+            - strong [ref=e290]: "3"
+            - generic [ref=e291]:
+              - strong [ref=e292]: What is the correct way to declare a variable in modern JavaScript?
+              - generic [ref=e293]: MCQ - 1 Mark
+            - img [ref=e294]
+          - button "4 What is the purpose of the use strict directive in JavaScript? MCQ - 1 Mark" [ref=e298] [cursor=pointer]:
+            - strong [ref=e299]: "4"
+            - generic [ref=e300]:
+              - strong [ref=e301]: What is the purpose of the use strict directive in JavaScript?
+              - generic [ref=e302]: MCQ - 1 Mark
+            - img [ref=e303]
+          - button "5 Which keyword creates a block-scoped variable in JavaScript? MCQ - 1 Mark" [ref=e307] [cursor=pointer]:
+            - strong [ref=e308]: "5"
+            - generic [ref=e309]:
+              - strong [ref=e310]: Which keyword creates a block-scoped variable in JavaScript?
+              - generic [ref=e311]: MCQ - 1 Mark
+            - img [ref=e312]
+          - button "6 Which DBMS concept helps reduce data redundancy? MCQ - 1 Mark" [ref=e316] [cursor=pointer]:
+            - strong [ref=e317]: "6"
+            - generic [ref=e318]:
+              - strong [ref=e319]: Which DBMS concept helps reduce data redundancy?
+              - generic [ref=e320]: MCQ - 1 Mark
+            - img [ref=e321]
+          - button "Add Question" [ref=e134] [cursor=pointer]:
+            - img [ref=e135]
+            - text: Add Question
+        - generic [ref=e136]:
+          - generic [ref=e137]:
+            - heading "Question 5" [level=3] [ref=e325]
+            - generic [ref=e139]:
+              - button "AI Generate AI" [ref=e140] [cursor=pointer]:
+                - generic [ref=e141]: AI
+                - text: Generate AI
+              - combobox [ref=e142]:
+                - option "MCQ Single Answer" [selected]
+                - option "Multiple Answer"
+                - option "Short Answer"
+                - option "True/False"
+              - button "Delete question" [ref=e143] [cursor=pointer]:
+                - img [ref=e144]
+          - strong [ref=e148]: Question Text *
+          - generic [ref=e149]:
+            - img [ref=e150]
+            - img [ref=e152]
+            - img [ref=e154]
+            - img [ref=e156]
+            - img [ref=e157]
+            - img [ref=e160]
+            - img [ref=e163]
+          - textbox [ref=e167]: Which keyword creates a block-scoped variable in JavaScript?
+          - button "Add image" [ref=e168] [cursor=pointer]:
+            - img [ref=e169]
+            - text: Add image
+          - paragraph [ref=e173]: "Characters: 60"
+          - heading "Options *" [level=3] [ref=e174]
+          - generic [ref=e175]:
+            - generic [ref=e326]:
+              - button "Mark option 1 correct" [ref=e327] [cursor=pointer]
+              - textbox [ref=e328]: var
+              - button "Remove option" [ref=e329] [cursor=pointer]:
+                - img [ref=e330]
+            - generic [ref=e333]:
+              - button "Mark option 2 correct" [ref=e334] [cursor=pointer]
+              - textbox [ref=e335]: let
+              - generic [ref=e336]: Correct answer
+              - button "Remove option" [ref=e337] [cursor=pointer]:
+                - img [ref=e338]
+            - generic [ref=e341]:
+              - button "Mark option 3 correct" [ref=e342] [cursor=pointer]
+              - textbox [ref=e343]: function
+              - button "Remove option" [ref=e344] [cursor=pointer]:
+                - img [ref=e345]
+            - generic [ref=e348]:
+              - button "Mark option 4 correct" [ref=e349] [cursor=pointer]
+              - textbox [ref=e350]: return
+              - button "Remove option" [ref=e351] [cursor=pointer]:
+                - img [ref=e352]
+          - button "Add Option" [ref=e205] [cursor=pointer]:
+            - img [ref=e206]
+            - text: Add Option
+          - heading "Explanation (Optional)" [level=3] [ref=e207]
+          - textbox [ref=e208]: let creates block-scoped variables and is preferred for values that can change.
+          - generic [ref=e209]:
+            - button "Duplicate Question" [ref=e210] [cursor=pointer]:
+              - img [ref=e211]
+              - text: Duplicate Question
+            - generic [ref=e214]:
+              - button "Previous" [ref=e215] [cursor=pointer]
+              - button "Next" [ref=e216] [cursor=pointer]
+        - complementary [ref=e217]:
+          - generic [ref=e218]:
+            - heading "Question Settings" [level=3] [ref=e219]
+            - text: Marks *
+            - generic [ref=e220]:
+              - button "-" [ref=e221] [cursor=pointer]
+              - textbox [ref=e222]: "1"
+              - button "+" [ref=e223] [cursor=pointer]
+            - text: Negative Marks
+            - spinbutton [ref=e224]: "0"
+            - text: Time Limit (Optional)
+            - generic [ref=e225]:
+              - spinbutton [ref=e226]: "1"
+              - spinbutton [ref=e227]: "0"
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - strong [ref=e230]: Required
+                - text: Student must answer this question
+              - button [pressed] [ref=e231] [cursor=pointer]
+            - generic [ref=e233]:
+              - generic [ref=e234]:
+                - strong [ref=e235]: Shuffle Options
+                - text: Shuffle options for this question
+              - button [ref=e236] [cursor=pointer]
+          - generic [ref=e238]:
+            - heading "Tips" [level=3] [ref=e239]
+            - list [ref=e240]:
+              - listitem [ref=e241]: Use clear and concise questions.
+              - listitem [ref=e242]: Avoid ambiguous wording.
+              - listitem [ref=e243]: Add explanations to help students learn better.
+              - listitem [ref=e244]: You can reorder questions by dragging them later.
+          - generic [ref=e245]:
+            - heading "Quiz Progress" [level=3] [ref=e246]
+            - generic [ref=e247]:
+              - strong [ref=e250]:
+                - text: "6"
+                - text: Questions
+              - generic [ref=e251]:
+                - generic [ref=e252]:
+                  - text: Total Marks
+                  - strong [ref=e253]: "6"
+                - generic [ref=e254]:
+                  - text: Total Questions
+                  - strong [ref=e255]: "6"
+                - generic [ref=e256]:
+                  - text: Total Time
+                  - strong [ref=e257]: 6 min
+      - generic [ref=e258]:
+        - img [ref=e259]
+        - generic [ref=e262]:
+          - strong [ref=e263]: Saved as draft
+          - text: You can continue editing later
+        - button "Save as Draft" [active] [ref=e264] [cursor=pointer]
+        - button "Publish Quiz" [ref=e265] [cursor=pointer]:
+          - img [ref=e266]
+          - text: Publish Quiz
+        - link "Preview Quiz" [ref=e269] [cursor=pointer]:
+          - /url: /quiz/cmrbimh5t0003uj7stme39rc9/instructions
+  - alert [ref=e355]

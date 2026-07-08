@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PROFESSOR
+  STUDENT
+  ADMIN
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum QuestionType {
+  MCQ_SINGLE
+  MCQ_MULTIPLE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+}
+
+enum AIInsightType {
+  QUIZ_GENERATION
+  QUESTION_IMPROVEMENT
+  ATTEMPT_FEEDBACK
+  TEACHER_ANALYTICS
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  name                String
+  email               String             @unique
+  passwordHash        String
+  role                UserRole
+  avatarUrl           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  classrooms          Classroom[]        @relation("ProfessorClassrooms")
+  enrollments         ClassroomStudent[]
+  quizzes             Quiz[]             @relation("ProfessorQuizzes")
+  attempts            QuizAttempt[]
+  aiInsights          AIInsight[]
+  questionBankItems   QuestionBankItem[]
+}
+
+model Classroom {
+  id          String             @id @default(cuid())
+  name        String
+  subject     String
+  section     String?
+  professorId String
+  joinCode    String             @unique
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  professor   User               @relation("ProfessorClassrooms", fields: [professorId], references: [id])
+  students    ClassroomStudent[]
+  quizzes     Quiz[]
+  aiInsights  AIInsight[]
+}
+
+model ClassroomStudent {
+  id          String    @id @default(cuid())
+  classroomId String
+  studentId   String
+  joinedAt    DateTime  @default(now())
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentId])
+}
+
+model Quiz {
+  id               String        @id @default(cuid())
+  title            String
+  description      String
+  subject          String
+  topic            String
+  difficulty       String
+  status           QuizStatus    @default(DRAFT)
+  professorId      String
+  classroomId      String?
+  timeLimitMinutes Int
+  totalMarks       Float         @default(0)
+  passingMarks     Float
+  aiGenerated      Boolean       @default(false)
+  aiPrompt         String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  publishedAt      DateTime?
+  professor        User          @relation("ProfessorQuizzes", fields: [professorId], references: [id])
+  classroom        Classroom?    @relation(fields: [classroomId], references: [id])
+  questions        Question[]
+  attempts         QuizAttempt[]
+  aiInsights       AIInsight[]
+}
+
+model Question {
+  id             String           @id @default(cuid())
+  quizId         String
+  type           QuestionType
+  text           String
+  explanation    String?
+  marks          Float
+  negativeMarks  Float            @default(0)
+  timeLimitSeconds Int?
+  required       Boolean          @default(true)
+  shuffleOptions Boolean          @default(false)
+  orderIndex     Int
+  aiGenerated    Boolean          @default(false)
+  sourceLabel    String?
+  difficulty     String?
+  topicTag       String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  quiz           Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options        QuestionOption[]
+  answers        AttemptAnswer[]
+}
+
+model QuestionOption {
+  id         String                  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean                 @default(false)
+  orderIndex Int
+  question   Question                @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selections AttemptSelectedOption[]
+}
+
+model QuizAttempt {
+  id               String          @id @default(cuid())
+  quizId           String
+  studentId        String
+  status           AttemptStatus    @default(IN_PROGRESS)
+  startedAt        DateTime         @default(now())
+  submittedAt      DateTime?
+  timeTakenSeconds Int?
+  score            Float            @default(0)
+  percentage       Float            @default(0)
+  passed           Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  quiz             Quiz             @relation(fields: [quizId], references: [id])
+  student          User             @relation(fields: [studentId], references: [id])
+  answers          AttemptAnswer[]
+  aiInsights       AIInsight[]
+}
+
+model AttemptAnswer {
+  id              String                  @id @default(cuid())
+  attemptId       String
+  questionId      String
+  textAnswer      String?
+  isCorrect       Boolean?
+  marksAwarded    Float                   @default(0)
+  markedForReview Boolean                 @default(false)
+  answeredAt      DateTime?
+  attempt         QuizAttempt             @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question        Question                @relation(fields: [questionId], references: [id])
+  selectedOptions AttemptSelectedOption[]
+
+  @@unique([attemptId, questionId])
+}
+
+model AttemptSelectedOption {
+  id              String         @id @default(cuid())
+  attemptAnswerId String
+  optionId        String
+  attemptAnswer   AttemptAnswer  @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
+  option          QuestionOption @relation(fields: [optionId], references: [id])
+
+  @@unique([attemptAnswerId, optionId])
+}
+
+model AIInsight {
+  id          String        @id @default(cuid())
+  quizId      String?
+  attemptId   String?
+  classroomId String?
+  userId      String?
+  type        AIInsightType
+  inputJson   String
+  outputJson  String
+  createdAt   DateTime      @default(now())
+  quiz        Quiz?         @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  attempt     QuizAttempt?  @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  classroom   Classroom?    @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model QuestionBankItem {
+  id          String       @id @default(cuid())
+  professorId String
+  subject     String
+  topic       String
+  difficulty  String
+  type        QuestionType
+  text        String
+  explanation String?
+  marks       Float        @default(1)
+  optionsJson String
+  aiGenerated Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  professor   User         @relation(fields: [professorId], references: [id])
+}

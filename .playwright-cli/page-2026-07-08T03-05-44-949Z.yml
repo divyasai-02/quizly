@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link [ref=e5] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e6]
+        - strong [ref=e8]: Quizly
+        - button "Fullscreen" [ref=e9] [cursor=pointer]:
+          - img [ref=e10]
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - img [ref=e18]
+          - generic [ref=e20]:
+            - heading "JavaScript Basics Quiz" [level=1] [ref=e21]
+            - paragraph [ref=e22]: Web Development
+        - paragraph [ref=e23]: This quiz will test your knowledge on the basics of JavaScript programming.
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - img [ref=e26]
+            - strong [ref=e29]: "20"
+            - text: Questions
+          - generic [ref=e30]:
+            - img [ref=e31]
+            - strong [ref=e34]: 15 min
+            - text: Time Limit
+          - generic [ref=e35]:
+            - img [ref=e36]
+            - strong [ref=e38]: "20"
+            - text: Total Marks
+          - generic [ref=e39]:
+            - img [ref=e40]
+            - strong [ref=e46]: Passing
+            - generic [ref=e47]: 10 Marks
+        - heading "Instructions" [level=2] [ref=e48]
+        - generic [ref=e49]:
+          - img [ref=e50]
+          - generic [ref=e53]: Read each question carefully before answering.
+        - generic [ref=e54]:
+          - img [ref=e55]
+          - generic [ref=e58]: You can navigate between questions.
+        - generic [ref=e59]:
+          - img [ref=e60]
+          - generic [ref=e63]: You can mark questions for review.
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - generic [ref=e68]: Your progress will be auto-saved.
+        - generic [ref=e69]:
+          - img [ref=e70]
+          - generic [ref=e73]: Do not refresh or close the tab during the quiz.
+        - generic [ref=e74]:
+          - img [ref=e75]
+          - generic [ref=e78]: The quiz will be auto-submitted when time runs out.
+        - generic [ref=e79]:
+          - strong [ref=e80]: "Tip:"
+          - text: You can review and change your answers before final submission.
+        - link "Start Quiz" [ref=e81] [cursor=pointer]:
+          - /url: /quiz/javascript-basics/take
+          - img [ref=e82]
+          - text: Start Quiz
+  - alert [ref=e85]
