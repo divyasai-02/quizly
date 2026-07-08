@@ -18,3 +18,5 @@ test-results
 
 .DS_Storetsconfig.tsbuildinfo
 .playwright-cli
+tsconfig.tsbuildinfo
+.playwright-cli
