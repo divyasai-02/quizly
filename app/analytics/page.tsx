@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
             <h2>Reteach {weakTopics[0]?.topic ?? "the most missed topic"} next.</h2>
             <p className="muted">{data.aiRecommendation ?? "Review difficult questions, then generate a short remedial quiz for the class."}</p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Link className="btn primary" href="/create-quiz"><ClipboardList size={17} />Generate remedial quiz</Link>
+              <Link className="btn primary" href={`/professor/create-quiz?ai=open&mode=analytics-remedial&topic=${encodeURIComponent(weakTopics[0]?.topic ?? "Core concepts")}&difficulty=Easy&questionCount=5&tone=Exam-focused`}><ClipboardList size={17} />Generate remedial questions</Link>
               <button className="btn" disabled title="Coming soon">Create revision plan</button>
               <Link className="btn ghost" href="#difficult-questions">Review difficult questions</Link>
             </div>
@@ -144,6 +144,9 @@ export default function AnalyticsPage() {
               <div className="soft-panel" style={{ padding: 16 }} key={item.question}>
                 <strong>{item.question}</strong>
                 <p className="muted small">{item.incorrect}% incorrect. Review this concept before the next quiz.</p>
+                <div style={{ marginTop: 10 }}>
+                  <Link className="linkish" href={`/professor/create-quiz?ai=open&mode=analytics-remedial&topic=${encodeURIComponent(item.question)}&difficulty=Easy&questionCount=5&tone=Exam-focused`}>Generate remedial questions</Link>
+                </div>
               </div>
             ))}
           </div>

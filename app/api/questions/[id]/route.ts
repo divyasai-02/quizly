@@ -19,6 +19,7 @@ export async function PUT(request: Request, { params }: Params) {
       text: string;
       options: string[];
       correct?: number;
+      correctAnswers?: number[];
       marks?: number;
       negativeMarks?: number;
       minutes?: number;
@@ -44,7 +45,7 @@ export async function PUT(request: Request, { params }: Params) {
           create: body.options.map((text, index) => ({
             text,
             orderIndex: index,
-            isCorrect: index === (body.correct ?? 0)
+            isCorrect: (body.correctAnswers?.length ? body.correctAnswers : [body.correct ?? 0]).includes(index)
           }))
         }
       },

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BrainCircuit, Flame, Sparkles, Trophy } from "lucide-react";
+import { BrainCircuit, Flame, PlayCircle, Sparkles, Trophy } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Badge, SkeletonCard, StatCard } from "@/components/ui";
+import { studentApi } from "@/lib/apiClient";
 
 const statIcons = {
-  "Active Quizzes": Sparkles,
+  "Active Quizzes": PlayCircle,
   Completed: Trophy,
   XP: Flame,
   Level: BrainCircuit
@@ -17,10 +18,9 @@ export default function StudentDashboardPage() {
   const [data, setData] = useState<any | null>(null);
 
   useEffect(() => {
-    fetch("/api/student/dashboard")
-      .then((response) => response.json())
+    studentApi.dashboard()
       .then(setData)
-      .catch(() => setData({ latestQuizzes: [], badges: [], classes: [], completedHistory: [] }));
+      .catch(() => setData({ latestQuizzes: [], badges: [], classes: [], completedHistory: [], latestLearning: null }));
   }, []);
 
   return (
@@ -33,7 +33,7 @@ export default function StudentDashboardPage() {
             <div className="section-head">
               <div>
                 <h2>Welcome back, {data.studentName}!</h2>
-                <p className="muted">Your learning momentum, assigned quizzes, and coaching suggestions are all here.</p>
+                <p className="muted">Your next learning step is ready as soon as you are.</p>
               </div>
               <Badge tone="green">Level {data.level}</Badge>
             </div>
@@ -50,20 +50,21 @@ export default function StudentDashboardPage() {
 
             <section className="ai-panel">
               <div className="grid">
-                <Badge tone="purple"><Sparkles size={14} /> AI Study Suggestion</Badge>
+                <Badge tone="purple"><Sparkles size={14} /> Continue Learning</Badge>
                 <div>
-                  <h2>Continue learning with a targeted next step.</h2>
+                  <h2>Pick up exactly where your latest quiz left off.</h2>
                   <p className="muted">{data.aiSuggestion}</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn primary" href="/student/classroom">Open classroom</Link>
-                  <Link className="btn" href="/student/study-room">Go to study room</Link>
+                  <Link className="btn primary" href={`/student/practice?topic=${encodeURIComponent(data.latestLearning?.weakTopics?.[0]?.topic ?? data.weakTopics?.[0] ?? "General")}`}>Recommended Practice</Link>
+                  <Link className="btn" href="/student/study-room">Go to Study Room</Link>
+                  {data.latestLearning?.attemptId ? <Link className="btn ghost" href={`/attempts/${data.latestLearning.attemptId}/review`}>Review Latest Answers</Link> : null}
                 </div>
               </div>
               <div className="insight-list">
                 <div className="insight-item"><span className="muted">Weak topics</span><strong>{data.weakTopics?.join(", ") || "No major weak topics yet"}</strong></div>
                 <div className="insight-item"><span className="muted">Average accuracy</span><strong>{data.averageAccuracy}%</strong></div>
-                <div className="insight-item"><span className="muted">Classes</span><strong>{data.classes?.length ?? 0} enrolled</strong></div>
+                <div className="insight-item"><span className="muted">Latest result</span><strong>{data.latestLearning ? `${Math.round(data.latestLearning.percentage)}% on ${data.latestLearning.quizTitle}` : "Take a quiz to generate this"}</strong></div>
                 <div className="insight-item"><span className="muted">Badges unlocked</span><strong>{data.badges?.filter((badge: any) => badge.unlocked).length ?? 0}</strong></div>
               </div>
             </section>
@@ -71,7 +72,50 @@ export default function StudentDashboardPage() {
             <div className="grid grid-2">
               <section className="card pad">
                 <div className="section-head">
-                  <h3>Latest Quizzes</h3>
+                  <h3>Latest Result</h3>
+                  {data.latestLearning?.attemptId ? <Link className="linkish" href={`/quiz/${data.latestLearning.quizId}/results?attemptId=${data.latestLearning.attemptId}`}>Open result</Link> : null}
+                </div>
+                {data.latestLearning ? (
+                  <div className="grid">
+                    <div className="soft-panel pad-sm">
+                      <strong>{data.latestLearning.quizTitle}</strong>
+                      <p className="muted small">{Math.round(data.latestLearning.score)} / {data.latestLearning.totalMarks} marks · {Math.round(data.latestLearning.percentage)}%</p>
+                    </div>
+                    <div className="grid grid-2">
+                      <div className="card pad"><strong>{data.latestLearning.correctCount}</strong><br /><span className="muted small">Correct</span></div>
+                      <div className="card pad"><strong>{data.latestLearning.incorrectCount + data.latestLearning.unansweredCount}</strong><br /><span className="muted small">Needs review</span></div>
+                    </div>
+                    <div className="soft-panel pad-sm">
+                      <strong>Next recommended step</strong>
+                      <p className="muted small">{data.latestLearning.feedback.recommendedPracticeSet}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="muted">Complete a quiz to unlock your detailed learning summary.</p>
+                )}
+              </section>
+
+              <section className="card pad">
+                <div className="section-head">
+                  <h3>Badge Preview</h3>
+                  <Link className="linkish" href="/student/achievements">See all</Link>
+                </div>
+                <div className="grid">
+                  {data.badges.slice(0, 4).map((badge: any) => (
+                    <div className="achievement-card" key={badge.name}>
+                      <strong>{badge.name}</strong>
+                      <p className="muted small">{badge.unlocked ? "Unlocked" : badge.criteria}</p>
+                      <div className="progress-line"><span style={{ width: `${badge.progress}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <div className="grid grid-2">
+              <section className="card pad">
+                <div className="section-head">
+                  <h3>Active Quizzes</h3>
                   <Link className="linkish" href="/student/classroom">View all</Link>
                 </div>
                 <div className="grid">
@@ -87,15 +131,18 @@ export default function StudentDashboardPage() {
 
               <section className="card pad">
                 <div className="section-head">
-                  <h3>Badges Preview</h3>
-                  <Link className="linkish" href="/student/achievements">See all</Link>
+                  <h3>Completed Quizzes</h3>
+                  <Link className="linkish" href="/student/study-room">Continue learning</Link>
                 </div>
                 <div className="grid">
-                  {data.badges.slice(0, 3).map((badge: any) => (
-                    <div className="achievement-card" key={badge.name}>
-                      <strong>{badge.name}</strong>
-                      <p className="muted small">{badge.unlocked ? "Unlocked" : "In progress"}</p>
-                      <div className="progress-line"><span style={{ width: `${badge.progress}%` }} /></div>
+                  {data.completedHistory.map((attempt: any) => (
+                    <div className="row-item" key={attempt.id}>
+                      <div>
+                        <strong>{attempt.title}</strong>
+                        <div className="muted small">{attempt.topic} · {attempt.percentage}%</div>
+                      </div>
+                      <span className="spacer" />
+                      <Link className="linkish" href={`/quiz/${paramsSafeQuizId(attempt)}/results?attemptId=${attempt.id}`}>View</Link>
                     </div>
                   ))}
                 </div>
@@ -106,4 +153,8 @@ export default function StudentDashboardPage() {
       </div>
     </AppShell>
   );
+}
+
+function paramsSafeQuizId(attempt: { quizId?: string; id?: string }) {
+  return attempt.quizId ?? "javascript-basics";
 }

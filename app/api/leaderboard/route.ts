@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
+import { calculateXpForAttempt } from "@/lib/services/studentLearningService";
 
 export async function GET() {
   try {
@@ -18,7 +19,14 @@ export async function GET() {
         accuracy: 0,
         initials: attempt.student.name.split(" ").map((part) => part[0]).join("").slice(0, 2)
       };
-      current.xp += Math.round(attempt.score * 100);
+      current.xp += calculateXpForAttempt({
+        score: attempt.score,
+        percentage: attempt.percentage,
+        passed: attempt.passed,
+        totalMarks: Math.max(1, attempt.score),
+        timeTakenSeconds: attempt.timeTakenSeconds,
+        suggestedTimeMinutes: attempt.quizId === "javascript-basics" ? 15 : attempt.quizId === "dbms-fundamentals" ? 18 : 20
+      });
       current.attempts += 1;
       current.accuracy += attempt.percentage;
       byStudent.set(attempt.studentId, current);

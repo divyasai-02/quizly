@@ -1,11 +1,11 @@
 import { errorResponse, json, readJson } from "@/lib/http";
 import { requireProfessor } from "@/lib/serverSession";
-import { aiService } from "@/lib/services/aiService";
+import { generateQuizDraft, type AiQuizGenerationInput } from "@/lib/services/aiQuizGenerationService";
 
 export async function POST(request: Request) {
   try {
-    const body = await readJson<{ prompt?: string; topic?: string; count?: number }>(request);
-    return json(await aiService.generateQuiz({ ...body, userId: requireProfessor(request).id }));
+    const body = await readJson<AiQuizGenerationInput>(request);
+    return json(await generateQuizDraft({ ...body, mode: body.mode ?? "quiz-builder", userId: requireProfessor(request).id }));
   } catch (error) {
     return errorResponse(error);
   }

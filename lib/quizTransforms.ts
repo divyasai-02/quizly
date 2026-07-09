@@ -28,6 +28,7 @@ export function questionTypeFromUi(type?: string) {
       return "MCQ_MULTIPLE";
     case "True/False":
       return "TRUE_FALSE";
+    case "Fill in the Blank":
     case "Short Answer":
       return "SHORT_ANSWER";
     default:
@@ -37,13 +38,15 @@ export function questionTypeFromUi(type?: string) {
 
 export function mapQuestion(question: QuizWithQuestions["questions"][number]) {
   const correct = Math.max(0, question.options.findIndex((option) => option.isCorrect));
+  const correctAnswers = question.options.map((option, index) => option.isCorrect ? index : -1).filter((value) => value >= 0);
   return {
     id: question.id,
-    type: questionTypeToUi(question.type),
+    type: question.type === "SHORT_ANSWER" && question.text.toLowerCase().includes("fill in the blank") ? "Fill in the Blank" : questionTypeToUi(question.type),
     text: question.text,
     options: question.options.map((option) => option.text),
     optionIds: question.options.map((option) => option.id),
     correct,
+    correctAnswers,
     explanation: question.explanation ?? "",
     marks: question.marks,
     negativeMarks: question.negativeMarks,

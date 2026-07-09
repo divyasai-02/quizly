@@ -1,9 +1,26 @@
 import { execSync } from "node:child_process";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import sqlite3 from "sqlite3";
 
-const dbPath = resolve(process.cwd(), "dev.db");
+function readDatabaseUrlFromEnvFile() {
+  const envPath = resolve(process.cwd(), ".env");
+  if (!existsSync(envPath)) return null;
+  const match = readFileSync(envPath, "utf8").match(/^DATABASE_URL=(.+)$/m);
+  return match ? match[1].trim().replace(/^"(.*)"$/, "$1") : null;
+}
+
+function resolveSqlitePath() {
+  const databaseUrl = process.env.DATABASE_URL?.trim() || readDatabaseUrlFromEnvFile();
+  if (!databaseUrl || !databaseUrl.startsWith("file:")) {
+    return resolve(process.cwd(), "dev.db");
+  }
+
+  const relativePath = databaseUrl.slice("file:".length);
+  return resolve(process.cwd(), relativePath);
+}
+
+const dbPath = resolveSqlitePath();
 
 if (existsSync(dbPath)) {
   try {

@@ -10,6 +10,7 @@ type QuestionPayload = {
   text: string;
   options: string[];
   correct?: number;
+  correctAnswers?: number[];
   marks?: number;
   negativeMarks?: number;
   minutes?: number;
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
               create: (question.options ?? []).map((text, index) => ({
                 text,
                 orderIndex: index,
-                isCorrect: index === (question.correct ?? 0)
+                isCorrect: (question.correctAnswers?.length ? question.correctAnswers : [question.correct ?? 0]).includes(index)
               }))
             }
           }))

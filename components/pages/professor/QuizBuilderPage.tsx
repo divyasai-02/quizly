@@ -18,14 +18,27 @@ import {
   Plus,
   Sparkles,
   Trash2,
-  Underline
+  Underline,
+  Wand2
 } from "lucide-react";
+import { AiQuizAgentPanel } from "@/components/ai/AiQuizAgentPanel";
 import { AppShell } from "@/components/AppShell";
 import { Badge, ToggleSwitch } from "@/components/ui";
 import { type QuizQuestion, sampleQuestions } from "@/data/mockData";
 import { aiApi, questionBankApi, quizApi } from "@/lib/apiClient";
+import { mapAiDraftToQuestionBankItem, mapAiDraftToQuizQuestion, type AiDraftQuestion, type AiDifficulty } from "@/lib/services/aiQuizGenerationService";
 
 const draftKey = "quizly-draft";
+
+type InitialAiState = {
+  open?: boolean;
+  mode?: "quiz-builder" | "analytics-remedial";
+  topic?: string;
+  subject?: string;
+  difficulty?: AiDifficulty;
+  questionCount?: number;
+  tone?: "Simple" | "Exam-focused" | "Conceptual" | "Placement prep";
+};
 
 function createQuestion(id: number): QuizQuestion {
   return {
@@ -34,6 +47,7 @@ function createQuestion(id: number): QuizQuestion {
     text: "New question text",
     options: ["Option A", "Option B", "Option C", "Option D"],
     correct: 0,
+    correctAnswers: [0],
     explanation: "",
     marks: 1,
     negativeMarks: 0,
@@ -46,13 +60,15 @@ function createQuestion(id: number): QuizQuestion {
 }
 
 function mapBankItemToQuestion(item: any): QuizQuestion {
-  const correct = Math.max(0, (item.options ?? []).findIndex((option: any) => option.isCorrect));
+  const correctAnswers = Math.max(0, (item.options ?? []).findIndex((option: any) => option.isCorrect));
+  const multipleCorrect = (item.options ?? []).map((option: any, index: number) => option.isCorrect ? index : -1).filter((value: number) => value >= 0);
   return {
     id: `bank-${item.id}-${Date.now()}`,
     type: item.typeLabel ?? "MCQ Single Answer",
     text: item.text,
     options: (item.options ?? []).map((option: any) => option.text),
-    correct,
+    correct: correctAnswers,
+    correctAnswers: multipleCorrect.length ? multipleCorrect : [correctAnswers],
     explanation: item.explanation ?? "",
     marks: item.marks ?? 1,
     negativeMarks: 0,
@@ -64,23 +80,39 @@ function mapBankItemToQuestion(item: any): QuizQuestion {
   };
 }
 
-export function QuizBuilderPage({ quizId }: { quizId?: string }) {
+function getQuestionTone(sourceLabel?: string) {
+  if (sourceLabel === "Template") return "blue";
+  if (sourceLabel === "Question Bank") return "green";
+  if (sourceLabel === "AI Drafted") return "amber";
+  return "purple";
+}
+
+function normalizedCorrectAnswers(question: QuizQuestion) {
+  if (question.type === "Multiple Answer") {
+    return question.correctAnswers?.length ? question.correctAnswers : [question.correct];
+  }
+  return [question.correct];
+}
+
+export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; initialAiState?: InitialAiState }) {
   const router = useRouter();
   const [title, setTitle] = useState("New Quiz Draft");
   const [goal, setGoal] = useState("Define what this quiz should assess and what students should learn from it.");
-  const [subject, setSubject] = useState("Computer Science");
-  const [topic, setTopic] = useState("General");
-  const [difficulty, setDifficulty] = useState("Easy");
+  const [subject, setSubject] = useState(initialAiState?.subject ?? "Computer Science");
+  const [topic, setTopic] = useState(initialAiState?.topic ?? "General");
+  const [difficulty, setDifficulty] = useState<AiDifficulty>(initialAiState?.difficulty ?? "Easy");
   const [questions, setQuestions] = useState<QuizQuestion[]>(sampleQuestions);
   const [active, setActive] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(quizId ?? null);
-  const [saved, setSaved] = useState("Ready to define quiz goal");
+  const [saved, setSaved] = useState(initialAiState?.open ? "AI panel is ready for review" : "Ready to define quiz goal");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [showBankPicker, setShowBankPicker] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(!!initialAiState?.open);
   const [bankItems, setBankItems] = useState<any[]>([]);
   const [bankSearch, setBankSearch] = useState("");
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  const [helperMessage, setHelperMessage] = useState<string | null>(null);
   const question = questions[active];
 
   useEffect(() => {
@@ -92,7 +124,11 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
           setSubject(quiz.subject ?? "Computer Science");
           setTopic(quiz.topic ?? "General");
           setDifficulty(quiz.difficulty ?? "Easy");
-          setQuestions((quiz.questionsList?.length ? quiz.questionsList : sampleQuestions).map((item: QuizQuestion) => ({ ...item, sourceLabel: item.sourceLabel ?? "Manual" })));
+          setQuestions((quiz.questionsList?.length ? quiz.questionsList : sampleQuestions).map((item: QuizQuestion) => ({
+            ...item,
+            correctAnswers: item.correctAnswers?.length ? item.correctAnswers : [item.correct],
+            sourceLabel: item.sourceLabel ?? "Manual"
+          })));
           setDraftId(quiz.id);
           setSaved("Editing backend draft");
         })
@@ -104,7 +140,7 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as QuizQuestion[];
-        setQuestions(parsed);
+        setQuestions(parsed.map((item) => ({ ...item, correctAnswers: item.correctAnswers?.length ? item.correctAnswers : [item.correct] })));
         setSaved("Loaded local draft");
       } catch {
         window.localStorage.removeItem(draftKey);
@@ -181,9 +217,11 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
     questions.forEach((item, index) => {
       if (!item.text.trim()) errors.push(`Question ${index + 1} needs question text.`);
       if (item.marks <= 0) errors.push(`Question ${index + 1} must have positive marks.`);
-      if (item.options.length < 2) errors.push(`Question ${index + 1} needs at least two options.`);
+      if (!item.options.length) errors.push(`Question ${index + 1} needs at least one answer option or accepted answer.`);
       if (item.options.some((option) => !option.trim())) errors.push(`Question ${index + 1} has an empty option.`);
-      if (item.correct < 0 || item.correct >= item.options.length) errors.push(`Question ${index + 1} needs a valid correct answer.`);
+      if (!normalizedCorrectAnswers(item).length || normalizedCorrectAnswers(item).some((answer) => answer < 0 || answer >= item.options.length)) {
+        errors.push(`Question ${index + 1} needs a valid correct answer.`);
+      }
     });
     setValidationErrors(errors);
     return errors;
@@ -196,7 +234,7 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
     setIsBusy(true);
     try {
       const payload = { title, description: goal, subject, topic, difficulty, questions };
-      const quiz = draftId ? await quizApi.update(draftId, payload) : await quizApi.create({ ...payload, aiPrompt: goal });
+      const quiz = draftId ? await quizApi.update(draftId, payload) : await quizApi.create({ ...payload, aiGenerated: questions.some((item) => item.sourceLabel === "AI Drafted"), aiPrompt: goal });
       setDraftId(quiz.id);
       if (!quizId) {
         router.replace(`/professor/quizzes/${quiz.id}/edit`);
@@ -232,18 +270,6 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
     }
   }
 
-  async function generateAiQuiz() {
-    setSaved("Generating AI quiz...");
-    try {
-      const generated = await aiApi.generateQuiz({ topic, count: 2 });
-      setQuestions((items) => [...items, ...generated.questions.map((item) => ({ ...item, id: Date.now() + Math.random(), sourceLabel: "AI Drafted" as const }))]);
-      setActive(questions.length);
-      setSaved("AI questions added");
-    } catch (error) {
-      setSaved(error instanceof Error ? error.message : "AI generation failed");
-    }
-  }
-
   function importSelectedBankQuestions() {
     const selected = filteredBankItems.filter((item) => selectedBankIds.includes(item.id)).map(mapBankItemToQuestion);
     if (!selected.length) return;
@@ -254,17 +280,61 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
     setSaved(`${selected.length} question${selected.length === 1 ? "" : "s"} imported from the bank`);
   }
 
+  async function handleInsertAiQuestions(drafts: AiDraftQuestion[], options: { alsoSaveToQuestionBank: boolean }) {
+    const mapped = drafts.map(mapAiDraftToQuizQuestion);
+    setQuestions((items) => [...items, ...mapped]);
+    setActive(questions.length);
+    setShowAiPanel(false);
+    setSaved(draftId ? "AI drafts inserted into the quiz builder." : "AI drafts inserted into local quiz state. Save draft when ready.");
+    if (options.alsoSaveToQuestionBank) {
+      await Promise.all(drafts.map((draft) => questionBankApi.create(mapAiDraftToQuestionBankItem(draft, { subject, topic: draft.topicTag, difficulty: draft.difficulty }))));
+      setSaved("AI drafts inserted and copied into Question Bank.");
+    }
+  }
+
+  async function handleSaveAiQuestionsToBank(drafts: AiDraftQuestion[]) {
+    await Promise.all(drafts.map((draft) => questionBankApi.create(mapAiDraftToQuestionBankItem(draft, { subject, topic: draft.topicTag, difficulty: draft.difficulty }))));
+    setSaved("Selected AI drafts saved to Question Bank.");
+  }
+
+  async function handleGenerateExplanation() {
+    try {
+      const answer = question.options[question.correct] ?? question.options[0] ?? "";
+      const response = await aiApi.generateExplanation(question.text, answer);
+      updateQuestion({ explanation: response.explanation });
+      setHelperMessage("AI explanation generated. Review it before publishing.");
+    } catch (error) {
+      setHelperMessage(error instanceof Error ? error.message : "Failed to generate explanation.");
+    }
+  }
+
+  function toggleCorrectAnswer(index: number) {
+    if (question.type === "Multiple Answer") {
+      const current = new Set(normalizedCorrectAnswers(question));
+      if (current.has(index)) {
+        current.delete(index);
+      } else {
+        current.add(index);
+      }
+      const next = Array.from(current).sort((a, b) => a - b);
+      updateQuestion({ correct: next[0] ?? 0, correctAnswers: next });
+      return;
+    }
+
+    updateQuestion({ correct: index, correctAnswers: [index] });
+  }
+
   if (!question) {
     return null;
   }
 
   return (
-    <AppShell title={draftId ? "Edit Draft Quiz" : "Create New Quiz"} subtitle="Build reusable quizzes from manual authoring, templates, and the question bank.">
+    <AppShell title={draftId ? "Edit Draft Quiz" : "Create New Quiz"} subtitle="Build reusable quizzes from manual authoring, templates, question bank imports, and reviewed AI drafts.">
       <div className="stepper">
         {["Define quiz goal", "Author and import", "Review and publish"].map((step, index) => (
           <div className={`step ${index === 0 ? "done" : ""} ${index === 1 ? "active" : ""}`} key={step}>
             <div className="step-num">{index + 1}</div>
-            <div><strong>{step}</strong><br /><span className="muted small">{index === 0 ? "Set intent" : index === 1 ? "Combine manual, bank, and template content" : "Validate before students see it"}</span></div>
+            <div><strong>{step}</strong><br /><span className="muted small">{index === 0 ? "Set intent" : index === 1 ? "Combine manual, bank, template, and AI content" : "Validate before students see it"}</span></div>
           </div>
         ))}
       </div>
@@ -273,24 +343,23 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
         <section className="card question-list">
           <div className="section-head" style={{ padding: "16px 16px 0" }}>
             <h3>Questions ({questions.length})</h3>
-            <button className="icon-button" onClick={addQuestion} aria-label="Add question"><Plus size={18} /></button>
+            <button className="icon-button" onClick={addQuestion} aria-label="Add question" type="button"><Plus size={18} /></button>
           </div>
           {questions.map((item, index) => (
-            <button className={`question-row ${index === active ? "active" : ""}`} key={item.id} onClick={() => setActive(index)}>
+            <button className={`question-row ${index === active ? "active" : ""}`} key={item.id} onClick={() => setActive(index)} type="button">
               <strong>{index + 1}</strong>
               <span style={{ textAlign: "left" }}>
                 <strong className="small">{item.text}</strong>
                 <br />
                 <span className="muted small">{item.sourceLabel ?? "Manual"} · {item.marks} Mark</span>
               </span>
-              <Badge tone={item.sourceLabel === "Template" ? "blue" : item.sourceLabel === "Question Bank" ? "green" : item.sourceLabel === "AI Drafted" ? "amber" : "purple"}>
-                {item.sourceLabel ?? "Manual"}
-              </Badge>
+              <Badge tone={getQuestionTone(item.sourceLabel)}>{item.sourceLabel ?? "Manual"}</Badge>
             </button>
           ))}
           <div style={{ padding: 16 }} className="grid">
-            <button className="btn full" onClick={addQuestion}><Plus size={17} />Add Question</button>
-            <button className="btn full" onClick={() => setShowBankPicker(true)}><Import size={17} />Import from Question Bank</button>
+            <button className="btn full" onClick={addQuestion} type="button"><Plus size={17} />Add Question</button>
+            <button className="btn full" onClick={() => setShowBankPicker(true)} type="button"><Import size={17} />Import from Question Bank</button>
+            <button className="btn full ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
           </div>
         </section>
 
@@ -304,15 +373,16 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
               <label><strong>Topic</strong><input className="input" value={topic} onChange={(event) => setTopic(event.target.value)} /></label>
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-              <select className="select" value={difficulty} onChange={(event) => setDifficulty(event.target.value)} style={{ maxWidth: 180 }}>
+              <select className="select" value={difficulty} onChange={(event) => setDifficulty(event.target.value as AiDifficulty)} style={{ maxWidth: 180 }}>
                 <option>Easy</option>
                 <option>Medium</option>
                 <option>Hard</option>
+                <option>Mixed</option>
               </select>
               <Link className="btn" href="/professor/templates"><BookOpen size={17} />Use Template</Link>
-              <button className="btn ghost" onClick={generateAiQuiz} type="button"><Sparkles size={17} />Generate with AI</button>
+              <button className="btn ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
             </div>
-            <p className="muted small">Use the question bank for reusable items, templates for faster starts, and AI drafts as a future-friendly placeholder path.</p>
+            <p className="muted small">Use the question bank for reusable items, templates for faster starts, and AI drafts as a professor-reviewed teaching assistant workflow.</p>
           </div>
           {validationErrors.length ? (
             <div className="notice" style={{ marginBottom: 18 }}>
@@ -322,56 +392,70 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
               </ul>
             </div>
           ) : null}
+          {helperMessage ? <div className="notice" style={{ marginBottom: 18 }}>{helperMessage}</div> : null}
           <div className="section-head">
             <h3>Question {active + 1}</h3>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <Badge tone={question.sourceLabel === "Template" ? "blue" : question.sourceLabel === "Question Bank" ? "green" : question.sourceLabel === "AI Drafted" ? "amber" : "purple"}>
-                {question.sourceLabel ?? "Manual"}
-              </Badge>
+              <Badge tone={getQuestionTone(question.sourceLabel)}>{question.sourceLabel ?? "Manual"}</Badge>
               <select className="select" value={question.type} onChange={(event) => updateQuestion({ type: event.target.value as QuizQuestion["type"] })}>
                 <option>MCQ Single Answer</option>
                 <option>Multiple Answer</option>
                 <option>Short Answer</option>
                 <option>True/False</option>
+                <option>Fill in the Blank</option>
               </select>
-              <button className="icon-button" aria-label="Delete question" onClick={deleteQuestion} disabled={questions.length <= 1}><Trash2 size={17} color="var(--pink)" /></button>
+              <button className="icon-button" aria-label="Delete question" onClick={deleteQuestion} disabled={questions.length <= 1} type="button"><Trash2 size={17} color="var(--pink)" /></button>
             </div>
           </div>
 
           <label><strong>Question Text *</strong></label>
           <div className="editor-toolbar">
             {[Bold, Italic, Underline, List, Code, LinkIcon, ImageIcon].map((Icon, index) => (
-              <button className="linkish" disabled title="Rich text controls coming soon" key={index}><Icon size={17} /></button>
+              <button className="linkish" disabled title="Rich text controls coming soon" key={index} type="button"><Icon size={17} /></button>
             ))}
           </div>
           <textarea className="textarea" value={question.text} onChange={(event) => updateQuestion({ text: event.target.value, sourceLabel: question.sourceLabel ?? "Manual" })} />
-          <button className="btn" style={{ marginTop: 10 }} disabled title="Coming soon"><ImageIcon size={17} />Add image - Coming soon</button>
+          <button className="btn" style={{ marginTop: 10 }} disabled title="Coming soon" type="button"><ImageIcon size={17} />Add image - Coming soon</button>
 
-          <h3>Options *</h3>
-          <div className="grid">
-            {question.options.map((option, index) => (
-              <div className={`option-row ${question.correct === index ? "correct" : ""}`} key={`${question.id}-${index}`}>
-                <button className="radio-dot" onClick={() => updateQuestion({ correct: index })} aria-label={`Mark option ${index + 1} correct`} />
-                <input className="input" value={option} onChange={(event) => updateOption(index, event.target.value)} />
-                {question.correct === index ? <Badge tone="green">Correct answer</Badge> : null}
-                <button className="icon-button" aria-label="Remove option" onClick={() => updateQuestion({ options: question.options.filter((_, optionIndex) => optionIndex !== index), correct: 0 })}>
-                  <Trash2 size={15} color="var(--pink)" />
-                </button>
-              </div>
-            ))}
+          <div className="section-head" style={{ marginTop: 18 }}>
+            <h3>{question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted Answer *" : "Options *"}</h3>
+            {question.type === "Multiple Answer" ? <Badge tone="blue">Select more than one correct answer if needed</Badge> : null}
           </div>
-          <button className="linkish" style={{ marginTop: 14 }} onClick={() => updateQuestion({ options: [...question.options, `Option ${question.options.length + 1}`] })}>
+          <div className="grid">
+            {question.options.map((option, index) => {
+              const selected = normalizedCorrectAnswers(question).includes(index);
+              return (
+                <div className={`option-row ${selected ? "correct" : ""}`} key={`${question.id}-${index}`}>
+                  <button className="radio-dot" onClick={() => toggleCorrectAnswer(index)} aria-label={`Mark option ${index + 1} correct`} type="button" />
+                  <input className="input" value={option} onChange={(event) => updateOption(index, event.target.value)} />
+                  {selected ? <Badge tone="green">Correct answer</Badge> : null}
+                  <button className="icon-button" aria-label="Remove option" onClick={() => updateQuestion({ options: question.options.filter((_, optionIndex) => optionIndex !== index), correct: 0, correctAnswers: [0] })} type="button">
+                    <Trash2 size={15} color="var(--pink)" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button className="linkish" style={{ marginTop: 14 }} onClick={() => updateQuestion({ options: [...question.options, question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted answer" : `Option ${question.options.length + 1}`] })} type="button">
             <Plus size={16} /> Add Option
           </button>
 
-          <h3>Explanation (Optional)</h3>
+          <div className="section-head" style={{ marginTop: 18 }}>
+            <h3>Explanation (Optional)</h3>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn" onClick={handleGenerateExplanation} type="button"><Wand2 size={16} />Generate explanation</button>
+              <button className="btn" disabled type="button">Improve wording - Coming soon</button>
+              <button className="btn" disabled type="button">Make easier - Coming soon</button>
+              <button className="btn" disabled type="button">Make harder - Coming soon</button>
+            </div>
+          </div>
           <textarea className="textarea" value={question.explanation} onChange={(event) => updateQuestion({ explanation: event.target.value })} />
 
           <div className="section-head" style={{ marginTop: 18 }}>
-            <button className="btn" onClick={duplicateQuestion}><Copy size={17} />Duplicate Question</button>
+            <button className="btn" onClick={duplicateQuestion} type="button"><Copy size={17} />Duplicate Question</button>
             <div style={{ display: "flex", gap: 12 }}>
-              <button className="btn" disabled={active === 0} onClick={() => setActive(Math.max(0, active - 1))}>Previous</button>
-              <button className="btn primary" onClick={() => setActive(Math.min(questions.length - 1, active + 1))}>Next</button>
+              <button className="btn" disabled={active === 0} onClick={() => setActive(Math.max(0, active - 1))} type="button">Previous</button>
+              <button className="btn primary" onClick={() => setActive(Math.min(questions.length - 1, active + 1))} type="button">Next</button>
             </div>
           </div>
         </section>
@@ -381,9 +465,9 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
             <h3>Question Settings</h3>
             <label className="small">Marks *</label>
             <div style={{ display: "flex", maxWidth: 150 }}>
-              <button className="btn" onClick={() => updateQuestion({ marks: Math.max(1, question.marks - 1) })}>-</button>
+              <button className="btn" onClick={() => updateQuestion({ marks: Math.max(1, question.marks - 1) })} type="button">-</button>
               <input className="input" value={question.marks} readOnly style={{ textAlign: "center" }} />
-              <button className="btn" onClick={() => updateQuestion({ marks: question.marks + 1 })}>+</button>
+              <button className="btn" onClick={() => updateQuestion({ marks: question.marks + 1 })} type="button">+</button>
             </div>
             <label className="small">Negative Marks</label>
             <input className="input" type="number" value={question.negativeMarks} onChange={(event) => updateQuestion({ negativeMarks: Number(event.target.value) })} />
@@ -402,7 +486,7 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
               <li>Pull reusable questions from the bank when possible.</li>
               <li>Use templates for rapid draft creation.</li>
               <li>Keep explanations clear so review flows stay helpful.</li>
-              <li>AI generation remains mock-friendly for now.</li>
+              <li>AI drafts remain editable and never auto-publish.</li>
             </ul>
           </section>
 
@@ -416,6 +500,7 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
                 <span>Total Marks <strong>{totals.marks}</strong></span>
                 <span>Total Questions <strong>{questions.length}</strong></span>
                 <span>Total Time <strong>{totals.time} min</strong></span>
+                <span>AI Drafts <strong>{questions.filter((item) => item.sourceLabel === "AI Drafted").length}</strong></span>
               </div>
             </div>
           </section>
@@ -425,8 +510,8 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
       <div className="bottom-actions">
         <CheckCircle2 color="var(--green)" />
         <div className="spacer"><strong>{saved}</strong><br /><span className="muted small">Draft and publish flow stays compatible with the existing quiz system</span></div>
-        <button className="btn" onClick={saveDraft} disabled={isBusy}>{isBusy ? "Saving..." : "Save Draft"}</button>
-        <button className="btn primary" onClick={publishQuiz} disabled={isBusy}><Eye size={17} />Publish Quiz</button>
+        <button className="btn" onClick={saveDraft} disabled={isBusy} type="button">{isBusy ? "Saving..." : "Save Draft"}</button>
+        <button className="btn primary" onClick={publishQuiz} disabled={isBusy} type="button"><Eye size={17} />Publish Quiz</button>
         <Link className="btn" href={`/quiz/${draftId ?? "javascript-basics"}/instructions`}>Preview Quiz</Link>
       </div>
 
@@ -468,6 +553,19 @@ export function QuizBuilderPage({ quizId }: { quizId?: string }) {
           </div>
         </div>
       ) : null}
+
+      <AiQuizAgentPanel
+        open={showAiPanel}
+        mode={initialAiState?.mode ?? "quiz-builder"}
+        onClose={() => setShowAiPanel(false)}
+        initialTopic={topic !== "General" ? topic : initialAiState?.topic}
+        initialSubject={subject}
+        initialDifficulty={initialAiState?.difficulty ?? difficulty}
+        initialQuestionCount={initialAiState?.questionCount}
+        initialTone={initialAiState?.tone}
+        onInsertQuestions={handleInsertAiQuestions}
+        onSaveQuestionsToBank={handleSaveAiQuestionsToBank}
+      />
     </AppShell>
   );
 }

@@ -40,7 +40,7 @@ export function validateQuestionInput(question: QuestionInput) {
     throw new Error("Time limits cannot be negative.");
   }
 
-  const isMcq = !question.type || question.type.includes("MCQ") || question.type.includes("Multiple");
+  const isMcq = !question.type || question.type.includes("MCQ") || question.type.includes("Multiple") || question.type.includes("True/False");
   if (isMcq) {
     if (!question.options || question.options.length < 2) {
       throw new Error("MCQ questions must have at least two options.");
@@ -66,7 +66,7 @@ export function validateQuestionBankItemInput(question: QuestionBankInput) {
     throw new Error("Marks must be positive.");
   }
 
-  const isMcq = !question.type || question.type.includes("MCQ") || question.type.includes("Multiple");
+  const isMcq = !question.type || question.type.includes("MCQ") || question.type.includes("Multiple") || question.type.includes("True/False");
   if (isMcq) {
     if (!question.options || question.options.length < 2) {
       throw new Error("MCQ questions must have at least two options.");

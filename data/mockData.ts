@@ -75,10 +75,11 @@ export const questionAnalysis = [
 
 export type QuizQuestion = {
   id: number | string;
-  type: "MCQ Single Answer" | "Multiple Answer" | "Short Answer" | "True/False";
+  type: "MCQ Single Answer" | "Multiple Answer" | "Short Answer" | "True/False" | "Fill in the Blank";
   text: string;
   options: string[];
   correct: number;
+  correctAnswers?: number[];
   explanation: string;
   marks: number;
   negativeMarks: number;

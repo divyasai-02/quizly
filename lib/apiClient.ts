@@ -1,4 +1,5 @@
 import type { QuizQuestion } from "@/data/mockData";
+import type { AiAgentMode, AiDifficulty, AiDraftQuestion, AiQuizGenerationOutput, AiQuestionType, AiBloomLevel, AiTone } from "@/lib/services/aiQuizGenerationService";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -40,14 +41,32 @@ export const quizApi = {
 export const attemptApi = {
   start: (quizId: string) => request<any>(`/api/quizzes/${quizId}/start`, { method: "POST" }),
   get: (attemptId: string) => request<any>(`/api/attempts/${attemptId}`),
+  review: (attemptId: string) => request<any>(`/api/attempts/${attemptId}/review`),
   saveAnswers: (attemptId: string, answers: any[]) => request(`/api/attempts/${attemptId}/answers`, { method: "PUT", body: JSON.stringify({ answers }) }),
   submit: (attemptId: string, answers: any[], autoSubmitted = false) =>
     request<any>(`/api/attempts/${attemptId}/submit`, { method: "POST", body: JSON.stringify({ answers, autoSubmitted }) }),
   results: (attemptId: string) => request<any>(`/api/attempts/${attemptId}/results`)
 };
 
+export const studentApi = {
+  dashboard: () => request<any>("/api/student/dashboard"),
+  learningSummary: () => request<any>("/api/student/learning-summary"),
+  attempts: () => request<any[]>("/api/student/attempts"),
+  studyRoom: () => request<any>("/api/student/study-room"),
+  practice: (topic: string) => request<any>(`/api/student/practice?topic=${encodeURIComponent(topic)}`),
+  submitPractice: (questions: any[], answers: Array<{ questionId: string; selectedOptionIds?: string[] }>) =>
+    request<any>("/api/student/practice/submit", { method: "POST", body: JSON.stringify({ questions, answers }) })
+};
+
 export const analyticsApi = {
   overview: () => request<any>("/api/analytics/overview")
+};
+
+export const reportsApi = {
+  summary: (params = "") => request<any>(`/api/reports/summary${params}`),
+  quizResults: (params = "") => request<any>(`/api/reports/quiz-results${params}`),
+  studentProgress: (params = "") => request<any>(`/api/reports/student-progress${params}`),
+  questionDifficulty: (params = "") => request<any>(`/api/reports/question-difficulty${params}`)
 };
 
 export const leaderboardApi = {
@@ -70,10 +89,64 @@ export const templateApi = {
   createQuiz: (id: string) => request<{ id: string; redirectTo: string }>(`/api/templates/${id}/create-quiz`, { method: "POST" })
 };
 
+export const adminApi = {
+  summary: () => request<any>("/api/admin/summary"),
+  users: () => request<any>("/api/admin/users"),
+  classes: () => request<any>("/api/admin/classes"),
+  subjects: () => request<any>("/api/admin/subjects"),
+  aiGenerations: () => request<any>("/api/admin/ai-generations")
+};
+
 export const aiApi = {
-  generateQuiz: (data: { prompt?: string; topic?: string; count?: number }) =>
-    request<{ title: string; questions: QuizQuestion[] }>("/api/ai/generate-quiz", { method: "POST", body: JSON.stringify(data) }),
-  improveQuestion: (text: string) => request<{ text: string; rationale: string }>("/api/ai/improve-question", { method: "POST", body: JSON.stringify({ text }) }),
+  generateQuiz: (data: {
+    mode: AiAgentMode;
+    topic?: string;
+    pastedNotes?: string;
+    subject?: string;
+    classId?: string;
+    questionCount?: number;
+    questionTypes?: AiQuestionType[];
+    difficulty?: AiDifficulty;
+    bloomLevel?: AiBloomLevel;
+    marksPerQuestion?: number;
+    negativeMarking?: boolean;
+    tone?: AiTone;
+    avoidQuestionBankDuplicates?: boolean;
+  }) =>
+    request<AiQuizGenerationOutput>("/api/ai/generate-quiz", { method: "POST", body: JSON.stringify(data) }),
+  regenerateQuestion: (data: {
+    mode: AiAgentMode;
+    topic?: string;
+    pastedNotes?: string;
+    subject?: string;
+    classId?: string;
+    questionCount?: number;
+    questionTypes?: AiQuestionType[];
+    difficulty?: AiDifficulty;
+    bloomLevel?: AiBloomLevel;
+    marksPerQuestion?: number;
+    negativeMarking?: boolean;
+    tone?: AiTone;
+    avoidQuestionBankDuplicates?: boolean;
+    questionIndex?: number;
+  }) =>
+    request<AiDraftQuestion>("/api/ai/regenerate-question", { method: "POST", body: JSON.stringify(data) }),
+  generateRemedialQuiz: (data: {
+    topic?: string;
+    pastedNotes?: string;
+    subject?: string;
+    classId?: string;
+    questionCount?: number;
+    questionTypes?: AiQuestionType[];
+    difficulty?: AiDifficulty;
+    bloomLevel?: AiBloomLevel;
+    marksPerQuestion?: number;
+    negativeMarking?: boolean;
+    tone?: AiTone;
+    avoidQuestionBankDuplicates?: boolean;
+  }) =>
+    request<AiQuizGenerationOutput>("/api/ai/generate-remedial-quiz", { method: "POST", body: JSON.stringify(data) }),
+  improveQuestion: (text: string, tone?: AiTone) => request<{ text: string; rationale: string }>("/api/ai/improve-question", { method: "POST", body: JSON.stringify({ text, tone }) }),
   generateExplanation: (question: string, answer: string) =>
     request<{ explanation: string }>("/api/ai/generate-explanation", { method: "POST", body: JSON.stringify({ question, answer }) })
 };

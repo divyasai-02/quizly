@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Filter, Plus, Sparkles, Upload } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { AiQuizAgentPanel } from "@/components/ai/AiQuizAgentPanel";
 import { Badge, SkeletonCard } from "@/components/ui";
 import { questionBankApi, quizApi } from "@/lib/apiClient";
+import { mapAiDraftToQuestionBankItem, type AiDraftQuestion } from "@/lib/services/aiQuizGenerationService";
 
 const blankForm = {
   subject: "",
@@ -29,6 +31,7 @@ export default function QuestionBankPage() {
   const [preview, setPreview] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showAddToQuiz, setShowAddToQuiz] = useState<any | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState("");
   const [form, setForm] = useState(blankForm);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +119,11 @@ export default function QuestionBankPage() {
     setSelectedQuizId("");
   }
 
+  async function saveGeneratedQuestions(questions: AiDraftQuestion[]) {
+    await Promise.all(questions.map((question) => questionBankApi.create(mapAiDraftToQuestionBankItem(question, { subject: form.subject || "Computer Science", topic: question.topicTag, difficulty: question.difficulty }))));
+    loadData();
+  }
+
   return (
     <AppShell title="Question Bank" subtitle="Build a reusable, searchable library of professor-approved questions.">
       <div className="content grid">
@@ -127,7 +135,7 @@ export default function QuestionBankPage() {
           <div className="toolbar-inline">
             <button className="btn primary" onClick={openCreate} type="button"><Plus size={17} />Add Question</button>
             <button className="btn" disabled type="button"><Upload size={17} />Import CSV/JSON</button>
-            <button className="btn ghost" disabled type="button"><Sparkles size={17} />Generate with AI</button>
+            <button className="btn ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
           </div>
         </div>
 
@@ -156,6 +164,7 @@ export default function QuestionBankPage() {
                     <td>
                       <strong>{item.text}</strong>
                       <div className="muted small">{item.explanation || "No explanation added yet."}</div>
+                      {item.aiGenerated ? <div style={{ marginTop: 8 }}><Badge tone="amber">AI Generated</Badge></div> : null}
                     </td>
                     <td>{item.subject}</td>
                     <td>{item.topic}</td>
@@ -273,6 +282,15 @@ export default function QuestionBankPage() {
           </div>
         </div>
       ) : null}
+
+      <AiQuizAgentPanel
+        open={showAiPanel}
+        mode="question-bank"
+        onClose={() => setShowAiPanel(false)}
+        initialSubject={form.subject || "Computer Science"}
+        onInsertQuestions={saveGeneratedQuestions}
+        onSaveQuestionsToBank={saveGeneratedQuestions}
+      />
     </AppShell>
   );
 }

@@ -1,34 +1,6 @@
 import { AIInsightType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-
-const generatedQuestions = [
-  {
-    type: "MCQ Single Answer",
-    text: "Which keyword creates a block-scoped variable in JavaScript?",
-    options: ["var", "let", "function", "return"],
-    correct: 1,
-    explanation: "let creates block-scoped variables and is preferred for values that can change.",
-    marks: 1,
-    negativeMarks: 0,
-    minutes: 1,
-    seconds: 0,
-    required: true,
-    shuffle: false
-  },
-  {
-    type: "MCQ Single Answer",
-    text: "Which DBMS concept helps reduce data redundancy?",
-    options: ["Normalization", "Compilation", "Routing", "Paging"],
-    correct: 0,
-    explanation: "Normalization structures tables to reduce redundancy and update anomalies.",
-    marks: 1,
-    negativeMarks: 0,
-    minutes: 1,
-    seconds: 0,
-    required: true,
-    shuffle: false
-  }
-];
+import { generateExplanation, generateQuizDraft, improveQuestion } from "@/lib/services/aiQuizGenerationService";
 
 async function record(type: AIInsightType, input: unknown, output: unknown, links: { quizId?: string; attemptId?: string; classroomId?: string; userId?: string } = {}) {
   await prisma.aIInsight.create({
@@ -44,36 +16,39 @@ async function record(type: AIInsightType, input: unknown, output: unknown, link
 
 export const aiService = {
   async generateQuiz(input: { prompt?: string; topic?: string; count?: number; userId?: string }) {
-    // TODO: Replace this deterministic mock with Gemini/OpenAI once API keys are configured.
-    const output = {
-      title: `${input.topic ?? "AI"} Practice Quiz`,
-      questions: generatedQuestions.slice(0, input.count ?? generatedQuestions.length)
+    const output = await generateQuizDraft({
+      mode: "quiz-builder",
+      topic: input.topic ?? input.prompt,
+      questionCount: input.count ?? 2,
+      userId: input.userId
+    });
+    return {
+      title: `${input.topic ?? input.prompt ?? "AI"} Practice Quiz`,
+      questions: output.questions.map((question) => ({
+        ...question,
+        options: question.options.map((option) => option.text)
+      }))
     };
-    return record(AIInsightType.QUIZ_GENERATION, input, output, { userId: input.userId });
   },
 
   async generateFromNotes(input: { notes?: string; userId?: string }) {
-    const output = {
+    const output = await generateQuizDraft({
+      mode: "quiz-builder",
+      pastedNotes: input.notes,
+      questionCount: 4,
+      userId: input.userId
+    });
+    return {
       title: "Notes Based Quiz",
-      questions: generatedQuestions
+      questions: output.questions.map((question) => ({
+        ...question,
+        options: question.options.map((option) => option.text)
+      }))
     };
-    return record(AIInsightType.QUIZ_GENERATION, input, output, { userId: input.userId });
   },
 
-  async improveQuestion(input: { text?: string; userId?: string }) {
-    const output = {
-      text: `${input.text ?? "Question"} Be precise and choose the best answer.`,
-      rationale: "Clarified wording and reduced ambiguity."
-    };
-    return record(AIInsightType.QUESTION_IMPROVEMENT, input, output, { userId: input.userId });
-  },
-
-  async generateExplanation(input: { question?: string; answer?: string; userId?: string }) {
-    const output = {
-      explanation: "The correct answer follows directly from the core concept being tested. Review the related topic once more for confidence."
-    };
-    return record(AIInsightType.QUESTION_IMPROVEMENT, input, output, { userId: input.userId });
-  },
+  improveQuestion,
+  generateExplanation,
 
   async analyzeAttempt(input: { attemptId?: string; score?: number; percentage?: number; userId?: string }) {
     const weakTopics = input.percentage && input.percentage >= 70 ? ["Applied edge cases"] : ["Core concepts", "Question interpretation"];

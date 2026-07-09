@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
-import { mapStudentDashboardData } from "@/lib/roleData";
 import { requireStudent } from "@/lib/serverSession";
+import { calculateProgressBadges, summarizeAttemptLearning } from "@/lib/services/studentLearningService";
 import { mapQuizSummary, quizInclude } from "@/lib/quizTransforms";
 
 export async function GET(request: Request) {
@@ -25,23 +25,97 @@ export async function GET(request: Request) {
       })
     ]);
 
-    const summary = mapStudentDashboardData({
-      studentName: user.name,
-      activeQuizCount: quizzes.length,
-      enrolledClassCount: enrollments.length,
-      attempts: attempts.map((attempt) => ({
-        score: attempt.score,
-        percentage: attempt.percentage,
-        topic: attempt.quiz.topic,
-        quizTitle: attempt.quiz.title,
-        subject: attempt.quiz.subject,
-        status: attempt.status,
-        createdAt: attempt.createdAt
-      }))
-    });
+    const completedAttempts = attempts.filter((attempt) => attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED");
+    const progress = calculateProgressBadges(completedAttempts.map((attempt) => ({
+      id: attempt.id,
+      quizId: attempt.quizId,
+      title: attempt.quiz.title,
+      subject: attempt.quiz.subject,
+      topic: attempt.quiz.topic,
+      difficulty: attempt.quiz.difficulty,
+      percentage: attempt.percentage,
+      score: attempt.score,
+      passed: attempt.passed,
+      status: attempt.status,
+      timeTakenSeconds: attempt.timeTakenSeconds,
+      suggestedTimeMinutes: attempt.quiz.timeLimitMinutes,
+      createdAt: attempt.createdAt
+    })));
+
+    let latestLearning = null;
+    const latestAttempt = completedAttempts[0];
+    if (latestAttempt) {
+      const detailed = await prisma.quizAttempt.findUnique({
+        where: { id: latestAttempt.id },
+        include: {
+          quiz: {
+            include: {
+              questions: {
+                include: { options: { orderBy: { orderIndex: "asc" } } },
+                orderBy: { orderIndex: "asc" }
+              }
+            }
+          },
+          answers: { include: { selectedOptions: true } }
+        }
+      });
+      if (detailed) {
+        latestLearning = summarizeAttemptLearning({
+          attempt: {
+            id: detailed.id,
+            score: detailed.score,
+            percentage: detailed.percentage,
+            passed: detailed.passed,
+            timeTakenSeconds: detailed.timeTakenSeconds,
+            status: detailed.status,
+            createdAt: detailed.createdAt,
+            quiz: {
+              id: detailed.quiz.id,
+              title: detailed.quiz.title,
+              subject: detailed.quiz.subject,
+              topic: detailed.quiz.topic,
+              difficulty: detailed.quiz.difficulty,
+              timeLimitMinutes: detailed.quiz.timeLimitMinutes,
+              totalMarks: detailed.quiz.totalMarks,
+              passingMarks: detailed.quiz.passingMarks,
+              questions: detailed.quiz.questions.map((question) => ({
+                id: question.id,
+                text: question.text,
+                topicTag: question.topicTag,
+                difficulty: question.difficulty,
+                explanation: question.explanation,
+                marks: question.marks,
+                options: question.options.map((option) => ({ id: option.id, text: option.text, isCorrect: option.isCorrect }))
+              }))
+            },
+            answers: detailed.answers.map((answer) => ({
+              questionId: answer.questionId,
+              textAnswer: answer.textAnswer,
+              isCorrect: answer.isCorrect,
+              marksAwarded: answer.marksAwarded,
+              markedForReview: answer.markedForReview,
+              selectedOptionIds: answer.selectedOptions.map((item) => item.optionId)
+            }))
+          }
+        });
+      }
+    }
+
+    const averageAccuracy = completedAttempts.length
+      ? Math.round(completedAttempts.reduce((total, attempt) => total + attempt.percentage, 0) / completedAttempts.length)
+      : 0;
 
     return json({
-      ...summary,
+      studentName: user.name,
+      activeQuizCount: quizzes.length,
+      completedQuizCount: completedAttempts.length,
+      xp: progress.xp,
+      level: progress.level,
+      averageAccuracy,
+      weakTopics: latestLearning?.weakTopics.map((topic) => topic.topic) ?? [],
+      aiSuggestion: latestLearning?.feedback.overall ?? "Complete a quiz to unlock your next recommended study step.",
+      badges: progress.badges,
+      latestLearning,
       latestQuizzes: quizzes.slice(0, 4).map(mapQuizSummary),
       classes: enrollments.map((item) => ({
         id: item.classroom.id,
@@ -51,9 +125,11 @@ export async function GET(request: Request) {
       })),
       completedHistory: attempts.slice(0, 5).map((attempt) => ({
         id: attempt.id,
+        quizId: attempt.quizId,
         title: attempt.quiz.title,
         percentage: Math.round(attempt.percentage),
-        status: attempt.status
+        status: attempt.status,
+        topic: attempt.quiz.topic
       }))
     });
   } catch (error) {

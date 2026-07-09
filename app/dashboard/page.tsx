@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, BookOpen, CheckCircle2, ChevronRight, ClipboardList, FileQuestion, GraduationCap, Library, Lock, MoreVertical, PlayCircle, Plus, Upload, Wand2 } from "lucide-react";
+import { BarChart3, BookOpen, CheckCircle2, ChevronRight, ClipboardList, FileQuestion, GraduationCap, Library, Lock, MoreVertical, PlayCircle, Plus, Sparkles, Upload, Wand2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Badge, SkeletonCard, StatCard } from "@/components/ui";
 import { dashboardApi } from "@/lib/apiClient";
@@ -49,7 +49,7 @@ export default function DashboardPage() {
             <h2>Welcome back, Prof. John!</h2>
             <p className="muted">Manage classes, launch quizzes, and review recent activity.</p>
           </div>
-          <Link className="btn primary" href="/create-quiz">
+          <Link className="btn primary" href="/professor/create-quiz">
             <Plus size={18} />
             Create Quiz
           </Link>
@@ -74,8 +74,8 @@ export default function DashboardPage() {
                   <p className="muted">Your assistant is tracking class readiness, draft work, and quiz performance so the next teaching action is visible before you open analytics.</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn primary" href="/create-quiz"><Plus size={17} />Generate Quiz</Link>
-                  <Link className="btn" href="/analytics"><ClipboardList size={17} />Review Weak Topics</Link>
+                  <Link className="btn primary" href="/professor/create-quiz?ai=open"><Sparkles size={17} />Generate Quiz with AI</Link>
+                  <Link className="btn" href="/professor/analytics"><ClipboardList size={17} />Review Weak Topics</Link>
                   <button className="btn ghost" disabled title="Coming soon">Create Revision Plan</button>
                 </div>
               </div>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
                     <td>{quiz.duration} min</td>
                     <td><Badge tone={quizStatusTone(quiz.status)}>{quizStatusLabel(quiz.status)}</Badge></td>
                     <td>{quiz.created}</td>
-                    <td><Link className="linkish" href="/create-quiz">Edit</Link></td>
+                    <td><Link className="linkish" href={`/professor/quizzes/${quiz.id}/edit`}>Edit</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
             {quickActions.map((action, index) => {
               const icons = [Plus, Upload, Library, Wand2];
               const Icon = icons[index];
-              const href = index === 0 ? "/create-quiz" : index === 2 ? "/question-bank" : index === 3 ? "/create-quiz" : "/templates";
+              const href = index === 0 ? "/professor/create-quiz" : index === 2 ? "/professor/question-bank" : index === 3 ? "/professor/create-quiz?ai=open" : "/professor/templates";
               return (
                 <Link className="nav-link" href={href} key={action}>
                   <Icon size={17} />
@@ -209,7 +209,7 @@ export default function DashboardPage() {
             <div className="soft-panel" style={{ padding: 18, marginTop: 18 }}>
               <strong>Save time!</strong>
               <p className="muted small">Use templates or AI-assisted outlines to generate questions quickly.</p>
-              <Link className="btn ghost" href="/create-quiz">Try AI Generator</Link>
+              <Link className="btn ghost" href="/professor/create-quiz?ai=open">Try AI Generator</Link>
             </div>
           </aside>
         </div> : null}

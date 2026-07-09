@@ -11,6 +11,8 @@ type SeedQuestion = {
   options: string[];
   correct: number[];
   type?: QuestionType;
+  topicTag?: string;
+  difficulty?: string;
 };
 
 const quizFixtures: Array<{
@@ -40,25 +42,29 @@ const quizFixtures: Array<{
         text: "What is the output of console.log(typeof []) in JavaScript?",
         explanation: "In JavaScript, arrays are a special type of object. Therefore, typeof [] returns object.",
         options: ["object", "array", "undefined", "function"],
-        correct: [0]
+        correct: [0],
+        topicTag: "Type checking"
       },
       {
         text: "Which company developed JavaScript?",
         explanation: "JavaScript was created at Netscape by Brendan Eich.",
         options: ["Netscape", "Microsoft", "Sun Microsystems", "Oracle"],
-        correct: [0]
+        correct: [0],
+        topicTag: "History"
       },
       {
         text: "What is the correct way to declare a variable in modern JavaScript?",
         explanation: "All are valid declarations, though let and const are preferred in modern code.",
         options: ["var myVar = 10;", "let myVar = 10;", "const myVar = 10;", "All of the above"],
-        correct: [3]
+        correct: [3],
+        topicTag: "Declarations"
       },
       {
         text: "What is the purpose of the use strict directive in JavaScript?",
         explanation: "Strict mode catches common mistakes and prevents some unsafe actions.",
         options: ["Adds CSS", "Enables stricter parsing", "Creates arrays", "Runs code faster only"],
-        correct: [1]
+        correct: [1],
+        topicTag: "Strict mode"
       }
     ]
   },
@@ -73,8 +79,8 @@ const quizFixtures: Array<{
     passingMarks: 1,
     status: QuizStatus.PUBLISHED,
     questions: [
-      { text: "Which normal form removes partial dependency?", explanation: "Second normal form removes partial dependency.", options: ["1NF", "2NF", "3NF", "BCNF"], correct: [1] },
-      { text: "SQL stands for?", explanation: "SQL means Structured Query Language.", options: ["Structured Query Language", "Simple Query Logic", "System Query Language", "Sequential Query Link"], correct: [0] }
+      { text: "Which normal form removes partial dependency?", explanation: "Second normal form removes partial dependency.", options: ["1NF", "2NF", "3NF", "BCNF"], correct: [1], topicTag: "Normalization" },
+      { text: "SQL stands for?", explanation: "SQL means Structured Query Language.", options: ["Structured Query Language", "Simple Query Logic", "System Query Language", "Sequential Query Link"], correct: [0], topicTag: "SQL Basics" }
     ]
   },
   {
@@ -88,8 +94,8 @@ const quizFixtures: Array<{
     passingMarks: 1,
     status: QuizStatus.PUBLISHED,
     questions: [
-      { text: "Round Robin scheduling is best known for using what?", explanation: "Round Robin uses a fixed time quantum.", options: ["Priority queue", "Time quantum", "Shortest burst", "Disk blocks"], correct: [1] },
-      { text: "A deadlock needs mutual exclusion.", explanation: "Mutual exclusion is one Coffman condition.", options: ["True", "False"], correct: [0], type: QuestionType.TRUE_FALSE }
+      { text: "Round Robin scheduling is best known for using what?", explanation: "Round Robin uses a fixed time quantum.", options: ["Priority queue", "Time quantum", "Shortest burst", "Disk blocks"], correct: [1], topicTag: "Scheduling" },
+      { text: "A deadlock needs mutual exclusion.", explanation: "Mutual exclusion is one Coffman condition.", options: ["True", "False"], correct: [0], type: QuestionType.TRUE_FALSE, topicTag: "Deadlocks" }
     ]
   },
   {
@@ -103,7 +109,7 @@ const quizFixtures: Array<{
     passingMarks: 1,
     status: QuizStatus.DRAFT,
     questions: [
-      { text: "What is 15% of 200?", explanation: "15 percent of 200 is 30.", options: ["20", "25", "30", "35"], correct: [2] }
+      { text: "What is 15% of 200?", explanation: "15 percent of 200 is 30.", options: ["20", "25", "30", "35"], correct: [2], topicTag: "Percentages" }
     ]
   }
 ];
@@ -179,8 +185,8 @@ async function main() {
           required: true,
           shuffleOptions: false,
           orderIndex,
-          difficulty: fixture.difficulty,
-          topicTag: fixture.topic,
+          difficulty: question.difficulty ?? fixture.difficulty,
+          topicTag: question.topicTag ?? fixture.topic,
           options: {
             create: question.options.map((text, index) => ({
               text,
@@ -193,40 +199,75 @@ async function main() {
     }
   }
 
-  const jsQuiz = await prisma.quiz.findUniqueOrThrow({
-    where: { id: "javascript-basics" },
-    include: { questions: { include: { options: true }, orderBy: { orderIndex: "asc" } } }
+  const publishedQuizzes = await prisma.quiz.findMany({
+    where: { status: QuizStatus.PUBLISHED },
+    include: { questions: { include: { options: true }, orderBy: { orderIndex: "asc" } } },
+    orderBy: { createdAt: "asc" }
   });
 
-  for (const [index, studentId] of studentIds.entries()) {
-    const correctAnswersTarget = 4 - index;
-    const attempt = await prisma.quizAttempt.create({
-      data: {
-        quizId: jsQuiz.id,
-        studentId,
-        status: AttemptStatus.SUBMITTED,
-        startedAt: new Date(Date.now() - (900 + index * 40) * 1000),
-        submittedAt: new Date(Date.now() - index * 1000),
-        timeTakenSeconds: 804 + index * 35,
-        score: correctAnswersTarget,
-        percentage: (correctAnswersTarget / 4) * 100,
-        passed: index < 2
-      }
-    });
+  const attemptPlans: Record<string, Record<string, Array<number | null>>> = {
+    "student-arjun": {
+      "javascript-basics": [0, 0, 3, 2],
+      "dbms-fundamentals": [1, 2],
+      "operating-systems": [1, 0]
+    },
+    "student-diya": {
+      "javascript-basics": [0, 1, 3, 1],
+      "dbms-fundamentals": [0, 0],
+      "operating-systems": [1, null]
+    },
+    "student-rohit": {
+      "javascript-basics": [2, null, 1, 0],
+      "dbms-fundamentals": [0, 3],
+      "operating-systems": [0, 1]
+    }
+  };
 
-    for (const [questionIndex, question] of jsQuiz.questions.entries()) {
-      const shouldBeCorrect = questionIndex < correctAnswersTarget;
-      const correctOption = question.options.find((item) => item.isCorrect) ?? question.options[0];
-      const incorrectOption = question.options.find((item) => !item.isCorrect) ?? question.options[0];
-      const option = shouldBeCorrect ? correctOption : incorrectOption;
-      await prisma.attemptAnswer.create({
+  for (const [studentIndex, studentId] of studentIds.entries()) {
+    for (const [quizIndex, quiz] of publishedQuizzes.entries()) {
+      const plan = attemptPlans[studentId]?.[quiz.id];
+      if (!plan) continue;
+
+      const attempt = await prisma.quizAttempt.create({
         data: {
-          attemptId: attempt.id,
-          questionId: question.id,
-          isCorrect: shouldBeCorrect,
-          marksAwarded: shouldBeCorrect ? question.marks : 0,
-          answeredAt: new Date(),
-          selectedOptions: { create: [{ optionId: option.id }] }
+          quizId: quiz.id,
+          studentId,
+          status: AttemptStatus.SUBMITTED,
+          startedAt: new Date(Date.now() - (quizIndex + 2 + studentIndex) * 86400000 - (quiz.timeLimitMinutes * 60 * 1000)),
+          submittedAt: new Date(Date.now() - (quizIndex + 2 + studentIndex) * 86400000),
+          timeTakenSeconds: Math.max(240, quiz.timeLimitMinutes * 45 + studentIndex * 60),
+          score: 0,
+          percentage: 0,
+          passed: false
+        }
+      });
+
+      let score = 0;
+      for (const [questionIndex, question] of quiz.questions.entries()) {
+        const answerIndex = plan[questionIndex];
+        const selectedOption = answerIndex === null || answerIndex === undefined ? null : question.options[answerIndex] ?? null;
+        const isCorrect = !!selectedOption?.isCorrect;
+        score += isCorrect ? question.marks : 0;
+        await prisma.attemptAnswer.create({
+          data: {
+            attemptId: attempt.id,
+            questionId: question.id,
+            isCorrect: answerIndex === null ? false : isCorrect,
+            marksAwarded: isCorrect ? question.marks : 0,
+            markedForReview: answerIndex === null,
+            answeredAt: answerIndex === null ? null : new Date(),
+            selectedOptions: selectedOption ? { create: [{ optionId: selectedOption.id }] } : undefined
+          }
+        });
+      }
+
+      const percentage = quiz.totalMarks > 0 ? (score / quiz.totalMarks) * 100 : 0;
+      await prisma.quizAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          score,
+          percentage,
+          passed: score >= quiz.passingMarks
         }
       });
     }
@@ -254,14 +295,56 @@ async function main() {
     ]
   });
 
-  await prisma.aIInsight.create({
-    data: {
-      quizId: "javascript-basics",
-      userId: professorId,
-      type: AIInsightType.TEACHER_ANALYTICS,
-      inputJson: JSON.stringify({ scope: "class performance" }),
-      outputJson: JSON.stringify({ summary: "Students are strong on declarations but need more practice on strict mode." })
-    }
+  await prisma.aIInsight.createMany({
+    data: [
+      {
+        quizId: "javascript-basics",
+        userId: professorId,
+        classroomId: web.id,
+        type: AIInsightType.TEACHER_ANALYTICS,
+        inputJson: JSON.stringify({ scope: "class performance" }),
+        outputJson: JSON.stringify({ summary: "Students are strong on declarations but need more practice on strict mode.", confidence: 82, warnings: ["Small sample size"] })
+      },
+      {
+        quizId: "dbms-fundamentals",
+        userId: professorId,
+        classroomId: cse.id,
+        type: AIInsightType.REMEDIAL_GENERATION,
+        inputJson: JSON.stringify({ topic: "SQL Basics", questionCount: 5 }),
+        outputJson: JSON.stringify({
+          summary: "Generated a short SQL recovery set for the weaker DBMS cohort.",
+          confidence: 79,
+          warnings: ["Contains advanced SQL terminology"],
+          questions: [
+            { text: "Which clause filters grouped rows?", difficulty: "Hard" },
+            { text: "What does SQL expand to?", difficulty: "Easy" },
+            { text: "Which command retrieves rows?", difficulty: "Easy" }
+          ]
+        })
+      },
+      {
+        quizId: "operating-systems",
+        userId: professorId,
+        classroomId: cse.id,
+        type: AIInsightType.QUIZ_GENERATION,
+        inputJson: JSON.stringify({ topic: "Scheduling", mode: "quiz-builder" }),
+        outputJson: JSON.stringify({
+          summary: "Drafted an OS scheduling quiz with mixed difficulty.",
+          confidence: 91,
+          questions: [
+            { text: "Round Robin uses a time quantum.", difficulty: "Easy" },
+            { text: "Which algorithm risks starvation?", difficulty: "Medium" },
+            { text: "Compare SJF and RR.", difficulty: "Hard" }
+          ]
+        })
+      },
+      {
+        userId: professorId,
+        type: AIInsightType.QUESTION_IMPROVEMENT,
+        inputJson: JSON.stringify({ text: "Explain normalization.", tone: "Conceptual" }),
+        outputJson: JSON.stringify({ text: "Explain how normalization reduces redundancy and anomalies.", rationale: "Clarified the learning objective.", confidence: 88 })
+      }
+    ]
   });
 }
 

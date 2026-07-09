@@ -611,6 +611,86 @@ button:disabled,
   padding: 22px;
 }
 
+.ai-agent-modal {
+  width: min(1320px, 100%);
+  max-height: min(92vh, 980px);
+  overflow: auto;
+}
+
+.ai-agent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 18px;
+}
+
+.ai-agent-tabs,
+.ai-chip-wrap,
+.ai-batch-bar,
+.ai-meta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ai-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #ddd4f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #524c68;
+  font-weight: 700;
+}
+
+.ai-chip.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #7046f3, #642ee8);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(109, 61, 242, 0.2);
+}
+
+.ai-upload-card,
+.ai-empty-state {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 180px;
+  padding: 26px;
+  border: 1px dashed #d7ccf6;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fbf9ff, #f3f7ff);
+  text-align: center;
+}
+
+.ai-question-card {
+  border-color: #e5dbff;
+}
+
+.ai-batch-bar {
+  justify-content: space-between;
+}
+
+.ai-privacy-copy {
+  border-color: #e6dbff;
+  background: #f7f2ff;
+  color: #5c3fb0;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes skeleton-pulse {
   0% {
     background-position: 200% 0;
@@ -1104,6 +1184,7 @@ button:disabled,
   .wizard,
   .take-layout,
   .ai-panel,
+  .ai-agent-layout,
   .grid-2,
   .grid-3,
   .grid-4,
