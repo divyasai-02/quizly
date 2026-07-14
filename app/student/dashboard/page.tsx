@@ -23,6 +23,12 @@ export default function StudentDashboardPage() {
       .catch(() => setData({ latestQuizzes: [], badges: [], classes: [], completedHistory: [], latestLearning: null }));
   }, []);
 
+  const recommendedTopic = data?.latestLearning?.weakTopics?.[0]?.topic
+    ?? data?.latestLearning?.practiceRecommendations?.[0]?.topic
+    ?? data?.weakTopics?.[0]
+    ?? data?.latestQuizzes?.[0]?.topic
+    ?? "JavaScript Basics";
+
   return (
     <AppShell title="Dashboard" subtitle="Stay on top of quizzes, progress, and what to study next.">
       <div className="content grid">
@@ -56,7 +62,7 @@ export default function StudentDashboardPage() {
                   <p className="muted">{data.aiSuggestion}</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn primary" href={`/student/practice?topic=${encodeURIComponent(data.latestLearning?.weakTopics?.[0]?.topic ?? data.weakTopics?.[0] ?? "General")}`}>Recommended Practice</Link>
+                  <Link className="btn primary" href={`/student/practice?topic=${encodeURIComponent(recommendedTopic)}`}>Recommended Practice</Link>
                   <Link className="btn" href="/student/study-room">Go to Study Room</Link>
                   {data.latestLearning?.attemptId ? <Link className="btn ghost" href={`/attempts/${data.latestLearning.attemptId}/review`}>Review Latest Answers</Link> : null}
                 </div>
@@ -79,7 +85,7 @@ export default function StudentDashboardPage() {
                   <div className="grid">
                     <div className="soft-panel pad-sm">
                       <strong>{data.latestLearning.quizTitle}</strong>
-                      <p className="muted small">{Math.round(data.latestLearning.score)} / {data.latestLearning.totalMarks} marks · {Math.round(data.latestLearning.percentage)}%</p>
+                      <p className="muted small">{Math.round(data.latestLearning.score)} / {data.latestLearning.totalMarks} marks - {Math.round(data.latestLearning.percentage)}%</p>
                     </div>
                     <div className="grid grid-2">
                       <div className="card pad"><strong>{data.latestLearning.correctCount}</strong><br /><span className="muted small">Correct</span></div>
@@ -119,13 +125,13 @@ export default function StudentDashboardPage() {
                   <Link className="linkish" href="/student/classroom">View all</Link>
                 </div>
                 <div className="grid">
-                  {data.latestQuizzes.map((quiz: any) => (
+                  {data.latestQuizzes.length ? data.latestQuizzes.map((quiz: any) => (
                     <div className="soft-panel pad-sm" key={quiz.id}>
                       <strong>{quiz.title}</strong>
-                      <p className="muted small">{quiz.className} · {quiz.questions} questions · {quiz.duration} min</p>
+                      <p className="muted small">{quiz.className} - {quiz.questions} questions - {quiz.duration} min</p>
                       <Link className="btn full" href={`/quiz/${quiz.id}/instructions`}>Open Quiz</Link>
                     </div>
-                  ))}
+                  )) : <p className="muted">No active quizzes yet. Ask your professor to publish one to begin.</p>}
                 </div>
               </section>
 
@@ -135,16 +141,16 @@ export default function StudentDashboardPage() {
                   <Link className="linkish" href="/student/study-room">Continue learning</Link>
                 </div>
                 <div className="grid">
-                  {data.completedHistory.map((attempt: any) => (
+                  {data.completedHistory.length ? data.completedHistory.map((attempt: any) => (
                     <div className="row-item" key={attempt.id}>
                       <div>
                         <strong>{attempt.title}</strong>
-                        <div className="muted small">{attempt.topic} · {attempt.percentage}%</div>
+                        <div className="muted small">{attempt.topic} - {attempt.percentage}%</div>
                       </div>
                       <span className="spacer" />
                       <Link className="linkish" href={`/quiz/${paramsSafeQuizId(attempt)}/results?attemptId=${attempt.id}`}>View</Link>
                     </div>
-                  ))}
+                  )) : <p className="muted">Your submitted quiz history will appear here after your first completion.</p>}
                 </div>
               </section>
             </div>

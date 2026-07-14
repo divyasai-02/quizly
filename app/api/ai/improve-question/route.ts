@@ -5,7 +5,7 @@ import { aiService } from "@/lib/services/aiService";
 export async function POST(request: Request) {
   try {
     const body = await readJson<{ text?: string }>(request);
-    return json(await aiService.improveQuestion({ ...body, userId: requireProfessor(request).id }));
+    return json(await aiService.improveQuestion({ ...body, userId: (await requireProfessor(request)).id }));
   } catch (error) {
     return errorResponse(error);
   }

@@ -10,13 +10,34 @@ import { analyticsApi } from "@/lib/apiClient";
 export default function AnalyticsPage() {
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [classFilter, setClassFilter] = useState("All");
+  const [quizFilter, setQuizFilter] = useState("All");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [questionFilter, setQuestionFilter] = useState("All");
 
   useEffect(() => {
     analyticsApi.overview().then(setData).catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Analytics failed to load."));
   }, []);
 
+  const classes = ["All", ...new Set((data?.classOverview ?? []).map((item: any) => item.name))] as string[];
+  const quizzes = ["All", ...new Set((data?.quizzes ?? []).filter((quiz: any) => classFilter === "All" || quiz.className === classFilter).map((quiz: any) => quiz.title))] as string[];
+  const filteredClassOverview = (data?.classOverview ?? []).filter((item: any) => classFilter === "All" || item.name === classFilter);
+  const filteredStudents = (data?.studentPerformance ?? []).filter((learner: any) => {
+    const query = studentSearch.trim().toLowerCase();
+    if (classFilter !== "All" && learner.className !== classFilter) return false;
+    if (quizFilter !== "All" && learner.quizTitle !== quizFilter) return false;
+    if (query && ![learner.student, learner.className, learner.quizTitle].some((value) => String(value).toLowerCase().includes(query))) return false;
+    return true;
+  });
+  const filteredQuestions = (data?.questionAnalysis ?? []).filter((row: any) => {
+    if (classFilter !== "All" && row.className !== classFilter) return false;
+    if (quizFilter !== "All" && row.quizTitle !== quizFilter) return false;
+    if (questionFilter !== "All" && row.difficulty !== questionFilter) return false;
+    return true;
+  });
   const weakTopics: Array<{ topic: string; incorrect: number }> = data?.weakTopics ?? [];
-  const difficultQuestions: Array<{ question: string; incorrect: number }> = [...(data?.questionAnalysis ?? [])].sort((a: any, b: any) => b.incorrect - a.incorrect).slice(0, 3);
+  const difficultQuestions: Array<{ question: string; incorrect: number }> = [...filteredQuestions].sort((a: any, b: any) => b.incorrect - a.incorrect).slice(0, 3);
+  const visibleAverage = filteredClassOverview.length ? Math.round(filteredClassOverview.reduce((sum: number, item: any) => sum + item.score, 0) / filteredClassOverview.length) : 0;
 
   return (
     <AppShell title="Analytics" subtitle="Track performance and gain insights across your classes.">
@@ -24,10 +45,10 @@ export default function AnalyticsPage() {
         <div className="section-head">
           <h2>Class Overview</h2>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <select className="select" disabled><option>All Classes</option></select>
-            <select className="select" disabled><option>All Quizzes</option></select>
-            <select className="select" disabled><option>Current seed data</option></select>
-            <button className="btn primary" disabled title="Coming soon"><Download size={17} />Export Report</button>
+            <select className="select" value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setQuizFilter("All"); }} aria-label="Class filter">{classes.map((item) => <option key={item}>{item === "All" ? "All Classes" : item}</option>)}</select>
+            <select className="select" value={quizFilter} onChange={(event) => setQuizFilter(event.target.value)} aria-label="Quiz filter">{quizzes.map((item) => <option key={item}>{item === "All" ? "All Quizzes" : item}</option>)}</select>
+            <select className="select" value={questionFilter} onChange={(event) => setQuestionFilter(event.target.value)} aria-label="Difficulty filter"><option>All</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+            <Link className="btn primary" href="/professor/reports"><Download size={17} />Open Reports</Link>
           </div>
         </div>
 
@@ -45,7 +66,12 @@ export default function AnalyticsPage() {
             <p className="muted">{data.aiRecommendation ?? "Review difficult questions, then generate a short remedial quiz for the class."}</p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Link className="btn primary" href={`/professor/create-quiz?ai=open&mode=analytics-remedial&topic=${encodeURIComponent(weakTopics[0]?.topic ?? "Core concepts")}&difficulty=Easy&questionCount=5&tone=Exam-focused`}><ClipboardList size={17} />Generate remedial questions</Link>
-              <button className="btn" disabled title="Coming soon">Create revision plan</button>
+              <Link
+                className="btn"
+                href={`/professor/create-quiz?ai=open&mode=analytics-remedial&topic=${encodeURIComponent(weakTopics[0]?.topic ?? "Core concepts")}&difficulty=Easy&questionCount=5&tone=Exam-focused`}
+              >
+                Create revision plan
+              </Link>
               <Link className="btn ghost" href="#difficult-questions">Review difficult questions</Link>
             </div>
           </div>
@@ -60,7 +86,7 @@ export default function AnalyticsPage() {
         </section>
 
         <div className="grid grid-6" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 18 }}>
-          {data.classOverview.map((item: any) => (
+          {filteredClassOverview.map((item: any) => (
             <div className="card pad" key={item.name} style={{ borderBottom: `5px solid var(--${item.tone})` }}>
               <div className={`icon-tile ${item.tone}`}><Users size={24} /></div>
               <h3>{item.name}</h3>
@@ -79,11 +105,11 @@ export default function AnalyticsPage() {
             <h3>Performance Comparison (Average Score)</h3>
             <div className="soft-panel" style={{ padding: 18, minWidth: 250 }}>
               <span className="muted">Overall Average Score</span>
-              <strong style={{ display: "block", color: "var(--purple)", fontSize: 30 }}>{data.overallAverage}%</strong>
+              <strong style={{ display: "block", color: "var(--purple)", fontSize: 30 }}>{visibleAverage}%</strong>
             </div>
           </div>
           <div className="bars">
-            {data.classOverview.map((item: any) => (
+            {filteredClassOverview.map((item: any) => (
               <div className="bar-wrap" key={item.name}>
                 <strong>{item.score}%</strong>
                 <div className="bar" style={{ height: `${item.score * 2}px`, background: `var(--${item.tone})` }} />
@@ -96,15 +122,15 @@ export default function AnalyticsPage() {
         <div className="grid grid-2">
           <section className="card">
             <div className="section-head" style={{ padding: "18px 20px 0" }}>
-              <h3>Student Performance (All Classes)</h3>
-              <input className="input" placeholder="Search coming soon" disabled style={{ maxWidth: 220 }} />
+              <h3>Student Performance ({classFilter === "All" ? "All Classes" : classFilter})</h3>
+              <input className="input" placeholder="Search students, classes, quizzes" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} style={{ maxWidth: 260 }} />
             </div>
             <table className="table">
               <thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Avg Score</th><th>Accuracy</th><th>Quizzes</th></tr></thead>
               <tbody>
-                {data.studentPerformance.map((learner: any) => (
+                {filteredStudents.map((learner: any, index: number) => (
                   <tr key={`${learner.rank}-${learner.student}`}>
-                    <td>{learner.rank}</td>
+                    <td>{index + 1}</td>
                     <td><strong>{learner.student}</strong></td>
                     <td>{learner.className}</td>
                     <td style={{ color: "var(--green)", fontWeight: 800 }}>{learner.avgScore}%</td>
@@ -114,17 +140,18 @@ export default function AnalyticsPage() {
                 ))}
               </tbody>
             </table>
+            {!filteredStudents.length ? <div className="pad"><p className="muted">No student results match these filters.</p></div> : null}
           </section>
 
           <section className="card" id="difficult-questions">
             <div className="section-head" style={{ padding: "18px 20px 0" }}>
               <h3>Questions Most Students Got Wrong</h3>
-              <select className="select" disabled style={{ maxWidth: 180 }}><option>All Questions</option></select>
+              <select className="select" value={questionFilter} onChange={(event) => setQuestionFilter(event.target.value)} style={{ maxWidth: 180 }}><option>All</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
             </div>
             <table className="table">
               <thead><tr><th>Question</th><th>Correct %</th><th>Incorrect %</th><th>Avg Time</th><th>Difficulty</th></tr></thead>
               <tbody>
-                {data.questionAnalysis.map((row: any) => (
+                {filteredQuestions.map((row: any) => (
                   <tr key={row.question}>
                     <td><strong>{row.question}</strong></td>
                     <td>{row.correct}%</td>
@@ -135,6 +162,7 @@ export default function AnalyticsPage() {
                 ))}
               </tbody>
             </table>
+            {!filteredQuestions.length ? <div className="pad"><p className="muted">No question results match these filters.</p></div> : null}
           </section>
         </div>
         <section className="card pad">

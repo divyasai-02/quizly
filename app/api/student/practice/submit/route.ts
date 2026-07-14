@@ -4,7 +4,7 @@ import { scorePracticeSubmission, type PracticeQuestion } from "@/lib/services/s
 
 export async function POST(request: Request) {
   try {
-    requireStudent(request);
+    await requireStudent(request);
     const body = await readJson<{
       questions?: PracticeQuestion[];
       answers?: Array<{ questionId: string; selectedOptionIds?: string[] }>;

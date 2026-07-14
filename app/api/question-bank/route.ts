@@ -6,7 +6,7 @@ import { validateQuestionBankItemInput } from "@/lib/validation";
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const items = await prisma.questionBankItem.findMany({
       where: { professorId: user.id },
       orderBy: { createdAt: "desc" }
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const body = await readJson<QuestionBankInput>(request);
     validateQuestionBankItemInput(body);
     const item = await prisma.questionBankItem.create({

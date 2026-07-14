@@ -70,7 +70,7 @@ export default function TakeQuizPage({ params }: { params: { id: string } }) {
   }, [answerPayload, attemptId, params.id, router]);
 
   useEffect(() => {
-    Promise.all([quizApi.get(params.id), attemptApi.start(params.id)])
+    Promise.all([quizApi.instructions(params.id), attemptApi.start(params.id)])
       .then(([quiz, attempt]) => {
         setQuizTitle(quiz.title);
         setQuestions(quiz.questionsList?.length ? quiz.questionsList : []);
@@ -138,7 +138,6 @@ export default function TakeQuizPage({ params }: { params: { id: string } }) {
                   </button>
                 ))}
               </div>
-              {selected !== undefined ? <div className="soft-panel" style={{ padding: 18, marginTop: 20 }}><strong>Explanation:</strong><p className="muted">{question.explanation}</p></div> : null}
               <div className="section-head" style={{ marginTop: 18 }}>
                 <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <input type="checkbox" checked={!!review[current]} onChange={() => setReview((items) => ({ ...items, [current]: !items[current] }))} />

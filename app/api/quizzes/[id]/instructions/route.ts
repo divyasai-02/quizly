@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
-import { mapQuizDetail, quizInclude } from "@/lib/quizTransforms";
+import { requireServerUser } from "@/lib/serverSession";
+import { mapQuizForStudent, quizInclude } from "@/lib/quizTransforms";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    await requireServerUser(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id }, include: quizInclude });
-    return json(mapQuizDetail(quiz));
+    return json(mapQuizForStudent(quiz));
   } catch (error) {
     return errorResponse(error);
   }

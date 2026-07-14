@@ -14,6 +14,8 @@ export default function ProfessorQuizzesPage() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("All");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function loadQuizzes() {
     quizApi.list().then(setRows).catch(() => setRows([]));
@@ -33,19 +35,34 @@ export default function ProfessorQuizzesPage() {
   }, [activeTab, rows, search]);
 
   async function publish(id: string) {
+    setNotice(null);
     await quizApi.publish(id);
     loadQuizzes();
   }
 
   async function closeQuiz(id: string) {
+    setNotice(null);
     await quizApi.close(id);
     loadQuizzes();
   }
 
   async function deleteQuiz(id: string) {
     if (!window.confirm("Delete this quiz?")) return;
+    setNotice(null);
     await quizApi.remove(id);
     loadQuizzes();
+  }
+
+  async function duplicateQuiz(id: string) {
+    setBusyId(id);
+    setNotice(null);
+    try {
+      const copy = await quizApi.duplicate(id);
+      setNotice(`Created draft copy: ${copy.title}`);
+      loadQuizzes();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -70,6 +87,8 @@ export default function ProfessorQuizzesPage() {
             </label>
           </div>
         </section>
+
+        {notice ? <div className="notice success">{notice}</div> : null}
 
         {!rows ? (
           <div className="grid grid-3">{Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index} lines={4} />)}</div>
@@ -100,7 +119,7 @@ export default function ProfessorQuizzesPage() {
                       <div className="table-actions">
                         {quiz.status === "Draft" ? <Link className="linkish" href={`/professor/quizzes/${quiz.id}/edit`}><PencilLine size={15} />Edit</Link> : null}
                         <Link className="linkish" href={`/quiz/${quiz.id}/instructions`}><Eye size={15} />Preview</Link>
-                        <button className="linkish" disabled type="button"><Copy size={15} />Duplicate</button>
+                        <button className="linkish" onClick={() => duplicateQuiz(quiz.id)} disabled={busyId === quiz.id} type="button"><Copy size={15} />{busyId === quiz.id ? "Duplicating..." : "Duplicate"}</button>
                         {quiz.status === "Draft" ? <button className="linkish" onClick={() => publish(quiz.id)} type="button"><Rocket size={15} />Publish</button> : null}
                         {quiz.status === "Live" ? <button className="linkish" onClick={() => closeQuiz(quiz.id)} type="button"><Rocket size={15} />Close</button> : null}
                         <button className="linkish" onClick={() => deleteQuiz(quiz.id)} type="button"><Trash2 size={15} />Delete</button>

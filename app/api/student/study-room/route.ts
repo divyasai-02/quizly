@@ -5,7 +5,7 @@ import { summarizeAttemptLearning } from "@/lib/services/studentLearningService"
 
 export async function GET(request: Request) {
   try {
-    const user = requireStudent(request);
+    const user = await requireStudent(request);
     const latestAttempt = await prisma.quizAttempt.findFirst({
       where: { studentId: user.id, status: { in: ["SUBMITTED", "AUTO_SUBMITTED"] } },
       include: {

@@ -35,6 +35,8 @@ export const sidebarByRole: Record<DemoRoleKey, SidebarItem[]> = {
     { label: "Subjects", href: "/admin/subjects" },
     { label: "Users", href: "/admin/users" },
     { label: "AI Moderation", href: "/admin/ai-moderation" },
+    { label: "Reports", href: "/admin/reports" },
+    { label: "Integrations", href: "/admin/integrations" },
     { label: "Settings", href: "/admin/settings" }
   ]
 };

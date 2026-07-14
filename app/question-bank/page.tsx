@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Filter, Plus, Sparkles, Upload } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AiQuizAgentPanel } from "@/components/ai/AiQuizAgentPanel";
@@ -35,6 +35,9 @@ export default function QuestionBankPage() {
   const [selectedQuizId, setSelectedQuizId] = useState("");
   const [form, setForm] = useState(blankForm);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   function loadData() {
     questionBankApi.list().then(setRows).catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Failed to load question bank."));
@@ -86,6 +89,7 @@ export default function QuestionBankPage() {
 
   async function submitForm() {
     setError(null);
+    setNotice(null);
     try {
       if (editing) {
         await questionBankApi.update(editing.id, form);
@@ -112,6 +116,23 @@ export default function QuestionBankPage() {
     loadData();
   }
 
+  async function importQuestions(file?: File) {
+    if (!file) return;
+    setError(null);
+    setNotice(null);
+    setImporting(true);
+    try {
+      const result = await questionBankApi.importFile(file);
+      setNotice(`Imported ${result.imported} question${result.imported === 1 ? "" : "s"} into the question bank.`);
+      loadData();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to import questions.");
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }
+
   async function addToQuiz() {
     if (!showAddToQuiz?.id || !selectedQuizId) return;
     await questionBankApi.addToQuiz(showAddToQuiz.id, selectedQuizId);
@@ -134,12 +155,14 @@ export default function QuestionBankPage() {
           </div>
           <div className="toolbar-inline">
             <button className="btn primary" onClick={openCreate} type="button"><Plus size={17} />Add Question</button>
-            <button className="btn" disabled type="button"><Upload size={17} />Import CSV/JSON</button>
+            <input ref={importInputRef} type="file" accept=".csv,.json,application/json,text/csv" style={{ display: "none" }} onChange={(event) => importQuestions(event.target.files?.[0])} />
+            <button className="btn" onClick={() => importInputRef.current?.click()} disabled={importing} type="button"><Upload size={17} />{importing ? "Importing..." : "Import CSV/JSON"}</button>
             <button className="btn ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
           </div>
         </div>
 
         {error ? <div className="notice">{error}</div> : null}
+        {notice ? <div className="notice success">{notice}</div> : null}
 
         <section className="card pad">
           <div className="toolbar-inline">

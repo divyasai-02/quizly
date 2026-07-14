@@ -4,7 +4,7 @@ import { requireProfessor } from "@/lib/serverSession";
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const classes = await prisma.classroom.findMany({
       where: { professorId: user.id },
       include: { students: true, quizzes: true },
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const body = await readJson<{ name?: string; subject?: string; section?: string }>(request);
     if (!body.name?.trim()) throw new Error("Class name is required.");
     const classroom = await prisma.classroom.create({

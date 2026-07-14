@@ -2,23 +2,29 @@ import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
 import { calculateXpForAttempt } from "@/lib/services/studentLearningService";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const attempts = await prisma.quizAttempt.findMany({
       where: { status: { in: ["SUBMITTED", "AUTO_SUBMITTED"] } },
-      include: { student: true },
+      include: { student: true, quiz: { include: { classroom: true } } },
       orderBy: [{ score: "desc" }, { timeTakenSeconds: "asc" }]
     });
 
-    const byStudent = new Map<string, { name: string; xp: number; attempts: number; accuracy: number; initials: string }>();
+    const byStudent = new Map<string, { name: string; xp: number; attempts: number; accuracy: number; initials: string; quizTitles: Set<string>; classNames: Set<string> }>();
     for (const attempt of attempts) {
       const current = byStudent.get(attempt.studentId) ?? {
         name: attempt.student.name,
         xp: 0,
         attempts: 0,
         accuracy: 0,
-        initials: attempt.student.name.split(" ").map((part) => part[0]).join("").slice(0, 2)
+        initials: attempt.student.name.split(" ").map((part) => part[0]).join("").slice(0, 2),
+        quizTitles: new Set<string>(),
+        classNames: new Set<string>()
       };
+      current.quizTitles.add(attempt.quiz.title);
+      if (attempt.quiz.classroom?.name) current.classNames.add(attempt.quiz.classroom.name);
       current.xp += calculateXpForAttempt({
         score: attempt.score,
         percentage: attempt.percentage,
@@ -42,6 +48,9 @@ export async function GET() {
         accuracy: Math.round(learner.accuracy / Math.max(1, learner.attempts)),
         streak: Math.max(3, 14 - index),
         initials: learner.initials,
+        quizTitles: [...learner.quizTitles],
+        classNames: [...learner.classNames],
+        attempts: learner.attempts,
         current: learner.name === "Arjun Mehta"
       }))
       .sort((a, b) => b.xp - a.xp)

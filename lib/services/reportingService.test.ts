@@ -1,14 +1,17 @@
-import { AttemptStatus, AIInsightType, QuizStatus, UserRole, type AIInsight, type AttemptAnswer, type Classroom, type ClassroomStudent, type Question, type QuestionBankItem, type Quiz, type QuizAttempt, type User } from "@prisma/client";
+import { AIInsightModerationStatus, AttemptStatus, AIInsightType, QuizStatus, UserRole, type AIInsight, type AttemptAnswer, type Classroom, type ClassroomStudent, type Question, type QuestionBankItem, type Quiz, type QuizAttempt, type User } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   buildAdminAiGenerationsView,
   buildAdminSubjectsView,
   buildAdminSummaryView,
+  buildReportCsv,
   buildProfessorReportsView,
   buildProfessorStudentsView,
   buildQuestionDifficultyCsv,
   buildQuizResultsCsv,
   buildStudentProgressCsv,
+  csvTableToExcelHtml,
+  csvTableToPdfBuffer,
   csvTableToString
 } from "./reportingService";
 
@@ -23,6 +26,7 @@ const professor: User = {
   passwordHash: "x",
   role: UserRole.PROFESSOR,
   avatarUrl: null,
+  disabledAt: null,
   createdAt: date("2026-07-01T00:00:00.000Z"),
   updatedAt: date("2026-07-01T00:00:00.000Z")
 };
@@ -34,6 +38,7 @@ const student: User = {
   passwordHash: "x",
   role: UserRole.STUDENT,
   avatarUrl: null,
+  disabledAt: null,
   createdAt: date("2026-07-01T00:00:00.000Z"),
   updatedAt: date("2026-07-01T00:00:00.000Z")
 };
@@ -45,6 +50,7 @@ const admin: User = {
   passwordHash: "x",
   role: UserRole.ADMIN,
   avatarUrl: null,
+  disabledAt: null,
   createdAt: date("2026-07-01T00:00:00.000Z"),
   updatedAt: date("2026-07-01T00:00:00.000Z")
 };
@@ -138,6 +144,11 @@ const aiInsight: AIInsight = {
   type: AIInsightType.REMEDIAL_GENERATION,
   inputJson: JSON.stringify({ topic: "SQL Basics" }),
   outputJson: JSON.stringify({ questions: [{ id: 1 }, { id: 2 }], summary: "Needs review", warnings: ["Contains advanced questions"] }),
+  moderationStatus: AIInsightModerationStatus.PENDING,
+  moderationNote: null,
+  moderatedAt: null,
+  moderatedById: null,
+  hiddenAt: null,
   createdAt: date("2026-07-04T00:00:00.000Z")
 };
 
@@ -228,6 +239,16 @@ describe("reportingService", () => {
 
     const difficultyCsv = buildQuestionDifficultyCsv(dataset as any, {});
     expect(difficultyCsv.rows[0]).toContain("Question");
+  });
+
+  it("exports every professor report type in CSV, Excel, and PDF forms", () => {
+    for (const reportType of ["classPerformance", "quizResults", "studentProgress", "questionDifficulty", "weakTopics", "engagement"]) {
+      const table = buildReportCsv(dataset as any, { reportType });
+      expect(table.rows[0].length).toBeGreaterThan(1);
+      expect(csvTableToString(table)).toContain("\"");
+      expect(csvTableToExcelHtml(table)).toContain("<table>");
+      expect(csvTableToPdfBuffer(table).subarray(0, 4).toString()).toBe("%PDF");
+    }
   });
 
   it("aggregates professor student profiles", () => {

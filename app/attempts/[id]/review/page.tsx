@@ -118,7 +118,7 @@ export default function AttemptReviewPage() {
                       <div className="soft-panel pad-sm">
                         <strong>Expected answer</strong>
                         <p className="muted small">{question.correctAnswer.join(", ")}</p>
-                        <Badge tone="amber">AI/manual review placeholder</Badge>
+                        <Badge tone="amber">Manual review recommended</Badge>
                       </div>
                     </div>
                   )}

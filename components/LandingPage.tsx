@@ -1,79 +1,75 @@
 "use client";
 
-import { ArrowRight, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState } from "react";
 import { Badge } from "@/components/ui";
-import { demoUsers, getRoleHome, setDemoUser } from "@/lib/demoSession";
+import { login } from "@/lib/authClient";
+import { demoLoginByRole, demoUsers, getRoleHome } from "@/lib/demoSession";
 
-const roleCards = [
-  {
-    role: "professor" as const,
-    title: "Continue as Professor",
-    text: "Manage classes, create quizzes, review analytics, and use Quizly's teaching tools."
-  },
-  {
-    role: "student" as const,
-    title: "Continue as Student",
-    text: "Take assigned quizzes, track progress, and focus your next study session."
-  },
-  {
-    role: "admin" as const,
-    title: "Continue as Admin",
-    text: "Oversee subjects, users, class health, and the broader platform experience."
-  }
+const roleOptions = [
+  { role: "professor" as const, label: "Professor", text: "Create quizzes and manage classes" },
+  { role: "student" as const, label: "Student", text: "Take quizzes and track your progress" },
+  { role: "admin" as const, label: "Administrator", text: "Manage users and platform activity" }
 ];
 
-const roleIcons = {
-  professor: Sparkles,
-  student: Users,
-  admin: ShieldCheck
-} as const;
-
 export function LandingPage() {
-  const router = useRouter();
+  const [selectedRole, setSelectedRole] = useState<keyof typeof demoUsers>("student");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleContinue(role: keyof typeof demoUsers) {
-    setDemoUser(role);
-    router.push(getRoleHome(role));
-    router.refresh();
+  async function handleContinue(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await login(demoLoginByRole[selectedRole]);
+      window.location.assign(getRoleHome(result.user.roleKey));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Demo login failed.");
+      setLoading(false);
+    }
   }
 
   return (
     <main className="landing-shell">
-      <section className="landing-hero">
-        <Badge tone="purple">Demo login</Badge>
-        <h1>Choose the Quizly role you want to explore.</h1>
-        <p className="muted">
-          This phase uses seeded demo accounts so you can move through the correct dashboard, routes, sidebar, and permissions without full password auth yet.
-        </p>
-        <div className="landing-grid">
-          {roleCards.map(({ role, title, text }) => {
-            const user = demoUsers[role];
-            const Icon = roleIcons[role];
-            return (
-              <button className="landing-card" key={role} onClick={() => handleContinue(role)} type="button">
-                <div className="landing-card-top">
-                  <div className="icon-tile purple">
-                    <Icon size={24} />
-                  </div>
-                  <Badge tone={role === "student" ? "green" : role === "admin" ? "amber" : "purple"}>{user.title}</Badge>
-                </div>
-                <h2>{title}</h2>
-                <p className="muted">{text}</p>
-                <div className="landing-user">
-                  <div className="avatar">{user.initials}</div>
-                  <div>
-                    <strong>{user.name}</strong>
-                    <div className="muted small">{user.email}</div>
-                  </div>
-                </div>
-                <span className="btn primary">
-                  Enter workspace
-                  <ArrowRight size={16} />
+      <section className="landing-hero role-choice-hero">
+        <div className="role-choice-intro">
+          <Badge tone="purple">Welcome to Quizly</Badge>
+          <h1>Choose your role</h1>
+          <p className="muted">Select how you want to use Quizly to continue.</p>
+        </div>
+
+        <form className="role-choice-form" onSubmit={handleContinue}>
+          <span className="role-choice-label">I am a...</span>
+          <div className="role-options">
+            {roleOptions.map(({ role, label, text }) => (
+              <label className={`role-option ${selectedRole === role ? "selected" : ""}`} key={role}>
+                <input
+                  checked={selectedRole === role}
+                  name="role"
+                  onChange={() => setSelectedRole(role)}
+                  type="radio"
+                  value={role}
+                />
+                <span>
+                  <strong>{label}</strong>
+                  <small>{text}</small>
                 </span>
-              </button>
-            );
-          })}
+              </label>
+            ))}
+          </div>
+          {error ? <div className="notice">{error}</div> : null}
+          <button className="btn primary full" disabled={loading} type="submit">
+            {loading ? "Signing in..." : "Continue"}
+          </button>
+        </form>
+
+        <div className="role-choice-links">
+          <span className="muted small">Already have an account?</span>
+          <Link href="/login">Sign in</Link>
+          <span className="muted small">or</span>
+          <Link href="/register">create an account</Link>
         </div>
       </section>
     </main>

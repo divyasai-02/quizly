@@ -1,11 +1,25 @@
 import type { QuizQuestion } from "@/data/mockData";
-import type { AiAgentMode, AiDifficulty, AiDraftQuestion, AiQuizGenerationOutput, AiQuestionType, AiBloomLevel, AiTone } from "@/lib/services/aiQuizGenerationService";
+import type { NotificationItem, NotificationListResponse } from "@/lib/notificationTypes";
+import type {
+  AiAgentMode,
+  AiBloomLevel,
+  AiDifficulty,
+  AiDraftQuestion,
+  AiExplanationOutput,
+  AiUploadedMaterialMetadata,
+  ParsedMaterialResult,
+  AiQuestionImprovementOutput,
+  AiQuestionType,
+  AiQuizGenerationOutput,
+  AiTone
+} from "@/lib/services/aiQuizGenerationService";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const response = await fetch(path, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(init?.headers ?? {})
     }
   });
@@ -22,7 +36,7 @@ export const dashboardApi = {
 
 export const classApi = {
   list: () => request<any[]>("/api/classes"),
-  create: (data: { name: string; subject?: string; section?: string }) => request("/api/classes", { method: "POST", body: JSON.stringify(data) })
+  create: (data: { name: string; subject?: string; section?: string }) => request<any>("/api/classes", { method: "POST", body: JSON.stringify(data) })
 };
 
 export const quizApi = {
@@ -34,6 +48,7 @@ export const quizApi = {
     request<any>(`/api/quizzes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   publish: (id: string) => request<any>(`/api/quizzes/${id}/publish`, { method: "POST" }),
   close: (id: string) => request<any>(`/api/quizzes/${id}/close`, { method: "POST" }),
+  duplicate: (id: string) => request<any>(`/api/quizzes/${id}/duplicate`, { method: "POST" }),
   remove: (id: string) => request<any>(`/api/quizzes/${id}`, { method: "DELETE" }),
   instructions: (id: string) => request<any>(`/api/quizzes/${id}/instructions`)
 };
@@ -77,6 +92,11 @@ export const questionBankApi = {
   list: () => request<any[]>("/api/question-bank"),
   get: (id: string) => request<any>(`/api/question-bank/${id}`),
   create: (data: any) => request<any>("/api/question-bank", { method: "POST", body: JSON.stringify(data) }),
+  importFile: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<{ imported: number; items: any[] }>("/api/question-bank/import", { method: "POST", body: formData });
+  },
   update: (id: string, data: any) => request<any>(`/api/question-bank/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id: string) => request<any>(`/api/question-bank/${id}`, { method: "DELETE" }),
   duplicate: (id: string) => request<any>(`/api/question-bank/${id}/duplicate`, { method: "POST" }),
@@ -92,16 +112,37 @@ export const templateApi = {
 export const adminApi = {
   summary: () => request<any>("/api/admin/summary"),
   users: () => request<any>("/api/admin/users"),
+  updateUser: (id: string, data: { action: "changeRole" | "deactivate" | "reactivate"; role?: string }) =>
+    request<any>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   classes: () => request<any>("/api/admin/classes"),
+  updateClass: (id: string, data: { name?: string; subject?: string; section?: string; professorId?: string }) =>
+    request<any>(`/api/admin/classes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   subjects: () => request<any>("/api/admin/subjects"),
-  aiGenerations: () => request<any>("/api/admin/ai-generations")
+  updateSubject: (subject: string, data: { action: "rename" | "merge"; targetSubject?: string }) =>
+    request<any>(`/api/admin/subjects/${encodeURIComponent(subject)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  aiGenerations: () => request<any>("/api/admin/ai-generations"),
+  updateAiGeneration: (id: string, data: { action: "approve" | "flag" | "hide" | "restore"; note?: string }) =>
+    request<any>(`/api/admin/ai-generations/${id}`, { method: "PATCH", body: JSON.stringify(data) })
+};
+
+export const notificationsApi = {
+  list: (limit?: number) => request<NotificationListResponse>(`/api/notifications${limit ? `?limit=${limit}` : ""}`),
+  markRead: (id: string) => request<NotificationItem>(`/api/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: () => request<NotificationListResponse>("/api/notifications/read-all", { method: "POST" })
 };
 
 export const aiApi = {
+  parseMaterial: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<ParsedMaterialResult>("/api/ai/parse-material", { method: "POST", body: formData });
+  },
   generateQuiz: (data: {
     mode: AiAgentMode;
     topic?: string;
     pastedNotes?: string;
+    materialText?: string;
+    materialMetadata?: AiUploadedMaterialMetadata;
     subject?: string;
     classId?: string;
     questionCount?: number;
@@ -118,6 +159,8 @@ export const aiApi = {
     mode: AiAgentMode;
     topic?: string;
     pastedNotes?: string;
+    materialText?: string;
+    materialMetadata?: AiUploadedMaterialMetadata;
     subject?: string;
     classId?: string;
     questionCount?: number;
@@ -134,6 +177,8 @@ export const aiApi = {
   generateRemedialQuiz: (data: {
     topic?: string;
     pastedNotes?: string;
+    materialText?: string;
+    materialMetadata?: AiUploadedMaterialMetadata;
     subject?: string;
     classId?: string;
     questionCount?: number;
@@ -146,7 +191,8 @@ export const aiApi = {
     avoidQuestionBankDuplicates?: boolean;
   }) =>
     request<AiQuizGenerationOutput>("/api/ai/generate-remedial-quiz", { method: "POST", body: JSON.stringify(data) }),
-  improveQuestion: (text: string, tone?: AiTone) => request<{ text: string; rationale: string }>("/api/ai/improve-question", { method: "POST", body: JSON.stringify({ text, tone }) }),
+  improveQuestion: (text: string, tone?: AiTone) =>
+    request<AiQuestionImprovementOutput>("/api/ai/improve-question", { method: "POST", body: JSON.stringify({ text, tone }) }),
   generateExplanation: (question: string, answer: string) =>
-    request<{ explanation: string }>("/api/ai/generate-explanation", { method: "POST", body: JSON.stringify({ question, answer }) })
+    request<AiExplanationOutput>("/api/ai/generate-explanation", { method: "POST", body: JSON.stringify({ question, answer }) })
 };

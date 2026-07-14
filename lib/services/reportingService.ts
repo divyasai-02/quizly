@@ -1,4 +1,4 @@
-import { AIInsightType, AttemptStatus, Prisma, QuizStatus, UserRole, type AIInsight, type AttemptAnswer, type Classroom, type ClassroomStudent, type Question, type QuestionBankItem, type QuestionOption, type Quiz, type QuizAttempt, type User } from "@prisma/client";
+import { AIInsightModerationStatus, AIInsightType, AttemptStatus, Prisma, QuizStatus, UserRole, type AIInsight, type AttemptAnswer, type Classroom, type ClassroomStudent, type Question, type QuestionBankItem, type QuestionOption, type Quiz, type QuizAttempt, type User } from "@prisma/client";
 import { calculateProgressBadges } from "@/lib/services/studentLearningService";
 
 type AttemptWithRelations = QuizAttempt & {
@@ -47,6 +47,8 @@ type CsvTable = {
   fileName: string;
   rows: string[][];
 };
+
+type ReportExportType = "classPerformance" | "quizResults" | "studentProgress" | "questionDifficulty" | "weakTopics" | "engagement";
 
 const REPORT_TYPE_META: Record<string, { label: string; description: string; formats: Array<"CSV" | "PDF" | "Excel"> }> = {
   classPerformance: {
@@ -404,7 +406,7 @@ export function buildProfessorReportsView(dataset: ReportingDataset, filters: Re
       lastGenerated: mostRecent,
       rowCount,
       formats: meta.formats,
-      enabledExports: key === "quizResults" || key === "studentProgress" || key === "questionDifficulty" ? ["CSV"] : [],
+      enabledExports: ["CSV", "PDF", "Excel"],
       isActive: activeType === key
     };
   });
@@ -549,10 +551,130 @@ export function buildQuestionDifficultyCsv(dataset: ReportingDataset, filters: R
   };
 }
 
+function buildClassPerformanceCsv(dataset: ReportingDataset, filters: ReportFilters): CsvTable {
+  const rows = buildClassPerformanceRows(dataset, filters);
+  return {
+    fileName: `class-performance-${filters.classId ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
+    rows: [
+      ["Class", "Subject", "Professor", "Students", "Quizzes", "Attempts", "Average Score", "Pass Rate", "Engagement", "Last Attempt"],
+      ...rows.map((row) => [row.className, row.subject, row.professor, String(row.students), String(row.quizzes), String(row.attempts), `${row.averageScore}%`, `${row.passRate}%`, row.engagement, formatDateLabel(row.lastAttemptAt)])
+    ]
+  };
+}
+
+function buildWeakTopicsCsv(dataset: ReportingDataset, filters: ReportFilters): CsvTable {
+  const rows = buildTopicCounts(filterProfessorAttempts(dataset, filters)).sort((left, right) => right.incorrectRate - left.incorrectRate);
+  return {
+    fileName: `weak-topics-${filters.classId ?? filters.quizId ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
+    rows: [
+      ["Topic", "Subject", "Attempts", "Correct Rate", "Incorrect Rate", "Recommendation"],
+      ...rows.map((row) => [row.topic, row.subject, String(row.attempts), `${row.correctRate}%`, `${row.incorrectRate}%`, recommendationForWeakTopic(row.topic)])
+    ]
+  };
+}
+
+function buildEngagementCsv(dataset: ReportingDataset, filters: ReportFilters): CsvTable {
+  const rows = buildEngagementRows(dataset, filters);
+  return {
+    fileName: `engagement-${filters.classId ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
+    rows: [
+      ["Class", "Completion Rate", "Active Learners", "Total Learners", "Attempts", "Recent Activity"],
+      ...rows.map((row) => [row.className, `${row.completionRate}%`, String(row.activeLearners), String(row.totalLearners), String(row.attempts), row.recentActivity])
+    ]
+  };
+}
+
+export function buildReportCsv(dataset: ReportingDataset, filters: ReportFilters): CsvTable {
+  const reportType = (filters.reportType || "quizResults") as ReportExportType;
+  if (reportType === "classPerformance") return buildClassPerformanceCsv(dataset, filters);
+  if (reportType === "studentProgress") return buildStudentProgressCsv(dataset, filters);
+  if (reportType === "questionDifficulty") return buildQuestionDifficultyCsv(dataset, filters);
+  if (reportType === "weakTopics") return buildWeakTopicsCsv(dataset, filters);
+  if (reportType === "engagement") return buildEngagementCsv(dataset, filters);
+  return buildQuizResultsCsv(dataset, filters);
+}
+
 export function csvTableToString(table: CsvTable) {
   return table.rows
     .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, "\"\"")}"`).join(","))
     .join("\n");
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function csvTableToExcelHtml(table: CsvTable) {
+  const rows = table.rows.map((row, rowIndex) => {
+    const tag = rowIndex === 0 ? "th" : "td";
+    return `<tr>${row.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join("")}</tr>`;
+  }).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse;font-family:Arial,sans-serif}th,td{border:1px solid #999;padding:6px 8px;text-align:left}th{background:#f0f3f8}</style></head><body><table>${rows}</table></body></html>`;
+}
+
+function pdfEscape(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function wrapText(value: string, max = 88) {
+  const words = value.replace(/\s+/g, " ").trim().split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > max && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+export function csvTableToPdfBuffer(table: CsvTable) {
+  const title = table.fileName.replace(/\.csv$/, "");
+  const lines = [
+    title,
+    "",
+    table.rows[0].join(" | "),
+    "-".repeat(96),
+    ...table.rows.slice(1, 35).flatMap((row) => wrapText(row.join(" | ")))
+  ];
+  const contentLines = lines.slice(0, 52);
+  const stream = [
+    "BT",
+    "/F1 10 Tf",
+    "40 780 Td",
+    "14 TL",
+    ...contentLines.map((line, index) => `${index === 0 ? "" : "T* " }(${pdfEscape(line)}) Tj`),
+    "ET"
+  ].join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(body, "utf8"));
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(body, "utf8");
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) {
+    body += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  }
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(body, "utf8");
 }
 
 export function buildProfessorStudentsView(dataset: ReportingDataset) {
@@ -587,6 +709,7 @@ export function buildProfessorStudentsView(dataset: ReportingDataset) {
 }
 
 function buildUserStatus(user: User, attempts: AttemptWithRelations[], aiInsights: InsightWithRelations[]) {
+  if (user.disabledAt) return "Deactivated";
   if (user.role === UserRole.ADMIN) return "Platform Admin";
   if (user.role === UserRole.PROFESSOR) {
     return aiInsights.some((item) => item.userId === user.id) ? "Active" : "Quiet";
@@ -623,6 +746,10 @@ export function buildAdminSummaryView(dataset: ReportingDataset) {
     confidence: extractConfidence(item.outputJson),
     warnings: extractWarnings(item.outputJson),
     status: deriveModerationStatus(item),
+    moderationStatus: item.moderationStatus,
+    moderationNote: item.moderationNote,
+    moderatedAt: formatDateLabel(item.moderatedAt),
+    hiddenAt: item.hiddenAt ? formatDateLabel(item.hiddenAt) : null,
     createdAt: formatDateLabel(item.createdAt),
     preview: summarizeInsightOutput(item.outputJson)
   }));
@@ -652,6 +779,17 @@ export function buildAdminSummaryView(dataset: ReportingDataset) {
       quizzes: value.quizzes,
       attempts: value.attempts
     })).sort((left, right) => right.attempts - left.attempts).slice(0, 6),
+    leaderboard: submittedAttempts
+      .map((attempt) => ({
+        student: attempt.student.name,
+        quiz: attempt.quiz.title,
+        className: attempt.quiz.classroom?.name ?? "Unassigned",
+        subject: attempt.quiz.subject,
+        score: `${attempt.score}/${attempt.quiz.totalMarks}`,
+        percentage: Math.round(attempt.percentage)
+      }))
+      .sort((left, right) => right.percentage - left.percentage)
+      .map((item, index) => ({ rank: index + 1, ...item })),
     systemHealth: [
       { label: "API availability", value: "Nominal", tone: "green", detail: "Core demo routes responded during verification." },
       { label: "Seed consistency", value: "Aligned", tone: "blue", detail: "Reports, dashboards, and moderation all reference seeded records." },
@@ -677,6 +815,7 @@ export function buildAdminUsersView(dataset: ReportingDataset) {
       name: user.name,
       email: user.email,
       role: user.role,
+      disabledAt: user.disabledAt,
       joinedDate: formatDateLabel(user.createdAt),
       classesOrEnrollments: user.role === UserRole.PROFESSOR ? quizzes.length ? dataset.classrooms.filter((classroom) => classroom.professorId === user.id).length : 0 : enrollments.length,
       quizzesOrAttempts: user.role === UserRole.PROFESSOR ? quizzes.length : attempts.length,
@@ -706,7 +845,10 @@ export function buildAdminClassesView(dataset: ReportingDataset) {
       id: classroom.id,
       name: classroom.name,
       subject: classroom.subject,
+      section: classroom.section,
+      professorId: classroom.professorId,
       professor: classroom.professor.name,
+      joinCode: classroom.joinCode,
       studentCount: classroom.students.length,
       quizCount: classroom.quizzes.length,
       averagePerformance,
@@ -790,6 +932,9 @@ function extractWarnings(outputJson: string) {
 }
 
 function deriveModerationStatus(item: InsightWithRelations) {
+  if (item.moderationStatus === AIInsightModerationStatus.ACCEPTED) return "Accepted";
+  if (item.moderationStatus === AIInsightModerationStatus.FLAGGED) return "Flagged";
+  if (item.moderationStatus === AIInsightModerationStatus.HIDDEN) return "Hidden";
   if (item.type === AIInsightType.QUESTION_IMPROVEMENT) return "Accepted";
   if (item.type === AIInsightType.TEACHER_ANALYTICS) return "Drafted";
   if (item.type === AIInsightType.REMEDIAL_GENERATION) return "Needs Review";

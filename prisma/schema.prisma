@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -41,6 +41,29 @@ enum AIInsightType {
   TEACHER_ANALYTICS
 }
 
+enum AIInsightModerationStatus {
+  PENDING
+  ACCEPTED
+  FLAGGED
+  HIDDEN
+}
+
+enum NotificationType {
+  AI_QUIZ_GENERATED
+  STUDENT_PERFORMANCE_RISK
+  QUIZ_COMPLETED
+  REPORT_GENERATED
+  NEW_QUIZ_ASSIGNED
+  RESULT_AVAILABLE
+  WEAK_TOPIC_PRACTICE_RECOMMENDED
+  BADGE_UNLOCKED
+  LEADERBOARD_RANK_UPDATED
+  ADMIN_AI_GENERATION_CREATED
+  ADMIN_NEW_USER_REGISTERED
+  ADMIN_LOW_CONFIDENCE_AI_GENERATION
+  ADMIN_PLATFORM_ACTIVITY_SUMMARY
+}
+
 model User {
   id                  String             @id @default(cuid())
   name                String
@@ -48,6 +71,7 @@ model User {
   passwordHash        String
   role                UserRole
   avatarUrl           String?
+  disabledAt          DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   classrooms          Classroom[]        @relation("ProfessorClassrooms")
@@ -56,6 +80,9 @@ model User {
   attempts            QuizAttempt[]
   aiInsights          AIInsight[]
   questionBankItems   QuestionBankItem[]
+  notifications       Notification[]
+  preferences         UserPreference[]
+  adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditActor")
 }
 
 model Classroom {
@@ -188,19 +215,24 @@ model AttemptSelectedOption {
 }
 
 model AIInsight {
-  id          String        @id @default(cuid())
-  quizId      String?
-  attemptId   String?
-  classroomId String?
-  userId      String?
-  type        AIInsightType
-  inputJson   String
-  outputJson  String
-  createdAt   DateTime      @default(now())
-  quiz        Quiz?         @relation(fields: [quizId], references: [id], onDelete: SetNull)
-  attempt     QuizAttempt?  @relation(fields: [attemptId], references: [id], onDelete: SetNull)
-  classroom   Classroom?    @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id               String                    @id @default(cuid())
+  quizId           String?
+  attemptId        String?
+  classroomId      String?
+  userId           String?
+  type             AIInsightType
+  inputJson        String
+  outputJson       String
+  moderationStatus AIInsightModerationStatus @default(PENDING)
+  moderationNote   String?
+  moderatedAt      DateTime?
+  moderatedById    String?
+  hiddenAt         DateTime?
+  createdAt        DateTime                  @default(now())
+  quiz             Quiz?                     @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  attempt          QuizAttempt?              @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  classroom        Classroom?                @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  user             User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model QuestionBankItem {
@@ -218,4 +250,53 @@ model QuestionBankItem {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   professor   User         @relation(fields: [professorId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  role      UserRole
+  context   String?
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  actionUrl String?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, role, read])
+  @@index([createdAt])
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model UserPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  value     String
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String?
+  createdAt DateTime @default(now())
+  actor     User     @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
+  @@index([createdAt])
 }

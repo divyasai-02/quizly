@@ -26,7 +26,7 @@ import { AppShell } from "@/components/AppShell";
 import { Badge, ToggleSwitch } from "@/components/ui";
 import { type QuizQuestion, sampleQuestions } from "@/data/mockData";
 import { aiApi, questionBankApi, quizApi } from "@/lib/apiClient";
-import { mapAiDraftToQuestionBankItem, mapAiDraftToQuizQuestion, type AiDraftQuestion, type AiDifficulty } from "@/lib/services/aiQuizGenerationService";
+import { mapAiDraftToQuestionBankItem, mapAiDraftToQuizQuestion, type AiDraftQuestion, type AiDifficulty, type AiProviderMetadata } from "@/lib/services/aiQuizGenerationService";
 
 const draftKey = "quizly-draft";
 
@@ -94,6 +94,20 @@ function normalizedCorrectAnswers(question: QuizQuestion) {
   return [question.correct];
 }
 
+function formatAiProviderMessage(provider?: Pick<AiProviderMetadata, "provider" | "usedFallback">, warnings: string[] = []) {
+  const status = provider?.usedFallback
+    ? "The configured AI provider was unavailable, so Quizly used the safe mock fallback."
+    : provider?.provider === "claude"
+      ? "Claude generated this response."
+      : provider?.provider === "openrouter"
+        ? "OpenRouter generated this response."
+      : "Quizly is running in mock AI mode.";
+
+  return warnings.length ? `${status} ${warnings[0]}` : status;
+}
+
+type EditorAction = "bold" | "italic" | "underline" | "list" | "code" | "link" | "image";
+
 export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; initialAiState?: InitialAiState }) {
   const router = useRouter();
   const [title, setTitle] = useState("New Quiz Draft");
@@ -107,6 +121,7 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
   const [saved, setSaved] = useState(initialAiState?.open ? "AI panel is ready for review" : "Ready to define quiz goal");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isBusy, setIsBusy] = useState(false);
+  const [aiEditAction, setAiEditAction] = useState<string | null>(null);
   const [showBankPicker, setShowBankPicker] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(!!initialAiState?.open);
   const [bankItems, setBankItems] = useState<any[]>([]);
@@ -185,6 +200,32 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
 
   function updateOption(index: number, value: string) {
     updateQuestion({ options: question.options.map((option, optionIndex) => (optionIndex === index ? value : option)) });
+  }
+
+  function applyEditorAction(action: EditorAction) {
+    const current = question.text || "";
+    const snippets: Record<EditorAction, string> = {
+      bold: current ? `**${current}**` : "**important term**",
+      italic: current ? `_${current}_` : "_emphasis_",
+      underline: current ? `<u>${current}</u>` : "<u>underlined text</u>",
+      list: `${current}${current ? "\n" : ""}- Key point\n- Another point`,
+      code: current ? `\`${current}\`` : "`code or formula`",
+      link: `${current}${current ? " " : ""}[reference](https://example.com)`,
+      image: `${current}${current ? "\n" : ""}![image description](https://example.com/image.png)`
+    };
+    updateQuestion({ text: snippets[action], sourceLabel: question.sourceLabel ?? "Manual" });
+    setHelperMessage(action === "image" ? "Image reference inserted. Replace the URL with your image link before publishing." : "Formatting inserted into the question text.");
+  }
+
+  function addImageReference() {
+    const url = window.prompt("Paste an image URL for this question:");
+    if (!url?.trim()) return;
+    const alt = window.prompt("Image description for accessibility:", "Question image") || "Question image";
+    updateQuestion({
+      text: `${question.text}${question.text ? "\n" : ""}![${alt.trim()}](${url.trim()})`,
+      sourceLabel: question.sourceLabel ?? "Manual"
+    });
+    setHelperMessage("Image reference added to the question text.");
   }
 
   function addQuestion() {
@@ -302,9 +343,29 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
       const answer = question.options[question.correct] ?? question.options[0] ?? "";
       const response = await aiApi.generateExplanation(question.text, answer);
       updateQuestion({ explanation: response.explanation });
-      setHelperMessage("AI explanation generated. Review it before publishing.");
+      setHelperMessage(formatAiProviderMessage(response.provider, response.warnings));
     } catch (error) {
       setHelperMessage(error instanceof Error ? error.message : "Failed to generate explanation.");
+    }
+  }
+
+  async function applyAiQuestionEdit(action: "improve" | "easier" | "harder") {
+    const prompts = {
+      improve: `Improve this quiz question wording without changing the intended answer. Question: ${question.text}`,
+      easier: `Rewrite this quiz question to be easier and clearer for students while preserving the same correct answer. Question: ${question.text}`,
+      harder: `Rewrite this quiz question to be more challenging while preserving the same correct answer. Question: ${question.text}`
+    };
+    const tone = action === "easier" ? "Simple" : action === "harder" ? "Exam-focused" : "Conceptual";
+
+    setAiEditAction(action);
+    try {
+      const response = await aiApi.improveQuestion(prompts[action], tone);
+      updateQuestion({ text: response.text, sourceLabel: question.sourceLabel === "AI Drafted" ? "AI Drafted" : "Manual" });
+      setHelperMessage(`${formatAiProviderMessage(response.provider, response.warnings)} ${response.rationale}`);
+    } catch (error) {
+      setHelperMessage(error instanceof Error ? error.message : "Failed to update question wording.");
+    } finally {
+      setAiEditAction(null);
     }
   }
 
@@ -410,12 +471,20 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
 
           <label><strong>Question Text *</strong></label>
           <div className="editor-toolbar">
-            {[Bold, Italic, Underline, List, Code, LinkIcon, ImageIcon].map((Icon, index) => (
-              <button className="linkish" disabled title="Rich text controls coming soon" key={index} type="button"><Icon size={17} /></button>
+            {[
+              { icon: Bold, action: "bold", label: "Bold" },
+              { icon: Italic, action: "italic", label: "Italic" },
+              { icon: Underline, action: "underline", label: "Underline" },
+              { icon: List, action: "list", label: "Bullets" },
+              { icon: Code, action: "code", label: "Code" },
+              { icon: LinkIcon, action: "link", label: "Link" },
+              { icon: ImageIcon, action: "image", label: "Image reference" }
+            ].map(({ icon: Icon, action, label }) => (
+              <button className="linkish" onClick={() => applyEditorAction(action as EditorAction)} title={label} key={action} type="button"><Icon size={17} /></button>
             ))}
           </div>
           <textarea className="textarea" value={question.text} onChange={(event) => updateQuestion({ text: event.target.value, sourceLabel: question.sourceLabel ?? "Manual" })} />
-          <button className="btn" style={{ marginTop: 10 }} disabled title="Coming soon" type="button"><ImageIcon size={17} />Add image - Coming soon</button>
+          <button className="btn" style={{ marginTop: 10 }} onClick={addImageReference} type="button"><ImageIcon size={17} />Add image reference</button>
 
           <div className="section-head" style={{ marginTop: 18 }}>
             <h3>{question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted Answer *" : "Options *"}</h3>
@@ -444,9 +513,9 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
             <h3>Explanation (Optional)</h3>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn" onClick={handleGenerateExplanation} type="button"><Wand2 size={16} />Generate explanation</button>
-              <button className="btn" disabled type="button">Improve wording - Coming soon</button>
-              <button className="btn" disabled type="button">Make easier - Coming soon</button>
-              <button className="btn" disabled type="button">Make harder - Coming soon</button>
+              <button className="btn" onClick={() => applyAiQuestionEdit("improve")} disabled={!!aiEditAction} type="button">{aiEditAction === "improve" ? "Improving..." : "Improve wording"}</button>
+              <button className="btn" onClick={() => applyAiQuestionEdit("easier")} disabled={!!aiEditAction} type="button">{aiEditAction === "easier" ? "Rewriting..." : "Make easier"}</button>
+              <button className="btn" onClick={() => applyAiQuestionEdit("harder")} disabled={!!aiEditAction} type="button">{aiEditAction === "harder" ? "Rewriting..." : "Make harder"}</button>
             </div>
           </div>
           <textarea className="textarea" value={question.explanation} onChange={(event) => updateQuestion({ explanation: event.target.value })} />

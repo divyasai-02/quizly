@@ -24,6 +24,8 @@ export const aiService = {
     });
     return {
       title: `${input.topic ?? input.prompt ?? "AI"} Practice Quiz`,
+      provider: output.provider,
+      warnings: output.warnings,
       questions: output.questions.map((question) => ({
         ...question,
         options: question.options.map((option) => option.text)
@@ -40,6 +42,8 @@ export const aiService = {
     });
     return {
       title: "Notes Based Quiz",
+      provider: output.provider,
+      warnings: output.warnings,
       questions: output.questions.map((question) => ({
         ...question,
         options: question.options.map((option) => option.text)

@@ -6,7 +6,7 @@ import { parseQuestionBankOptions } from "@/lib/questionBank";
 
 export async function GET(request: Request) {
   try {
-    requireStudent(request);
+    await requireStudent(request);
     const { searchParams } = new URL(request.url);
     const topic = searchParams.get("topic")?.trim() || "";
     if (!topic) throw new Error("Practice topic is required.");

@@ -6,7 +6,7 @@ import { validateQuestionBankItemInput } from "@/lib/validation";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const item = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
     if (item.professorId !== user.id) throw new Error("You can only view your own question bank items.");
     return json(mapQuestionBankItem(item));
@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const existing = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
     if (existing.professorId !== user.id) throw new Error("You can only edit your own question bank items.");
     const body = await readJson<QuestionBankInput>(request);
@@ -43,7 +43,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const existing = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
     if (existing.professorId !== user.id) throw new Error("You can only delete your own question bank items.");
     await prisma.questionBankItem.delete({ where: { id: params.id } });

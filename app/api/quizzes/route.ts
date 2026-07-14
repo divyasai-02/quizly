@@ -23,7 +23,7 @@ type QuestionPayload = {
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const quizzes = await prisma.quiz.findMany({
       where: { professorId: user.id },
       include: quizInclude,
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const body = await readJson<{
       title?: string;
       description?: string;

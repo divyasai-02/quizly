@@ -21,3 +21,4 @@ tsconfig.tsbuildinfo
 QUIZLY_*_REPORT.md
 
 .DS_Store
+node_modules

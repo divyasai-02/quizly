@@ -49,7 +49,19 @@ export default function StudentProfilePage() {
           </div>
           <div className="soft-panel pad-sm" style={{ marginTop: 18 }}>
             <strong>Accuracy trend</strong>
-            <p className="muted small">Trend chart placeholder for the next analytics pass.</p>
+            {(data?.completedHistory ?? []).length ? (
+              <div className="bars" style={{ minHeight: 130, marginTop: 12 }}>
+                {(data?.completedHistory ?? []).slice(-6).map((item: any) => (
+                  <div className="bar-wrap" key={item.id}>
+                    <strong>{item.percentage}%</strong>
+                    <div className="bar" style={{ height: `${Math.max(8, item.percentage * 1.2)}px`, background: "var(--purple)" }} />
+                    <span>{item.title.slice(0, 12)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted small">Complete quizzes to build your accuracy trend.</p>
+            )}
           </div>
         </section>
       </div>

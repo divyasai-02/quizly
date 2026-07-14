@@ -8,7 +8,7 @@ type Params = { params: { id: string } };
 
 export async function PUT(request: Request, { params }: Params) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const existing = await prisma.question.findUniqueOrThrow({
       where: { id: params.id },
       include: { quiz: true }
@@ -59,7 +59,7 @@ export async function PUT(request: Request, { params }: Params) {
 
 export async function DELETE(request: Request, { params }: Params) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const existing = await prisma.question.findUniqueOrThrow({ where: { id: params.id }, include: { quiz: true } });
     if (existing.quiz.professorId !== user.id) throw new Error("Only the professor who owns this quiz can delete questions.");
     await prisma.question.delete({ where: { id: params.id } });

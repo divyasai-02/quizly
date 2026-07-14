@@ -5,7 +5,7 @@ import { calculateProgressBadges, summarizeAttemptLearning } from "@/lib/service
 
 export async function GET(request: Request) {
   try {
-    const user = requireStudent(request);
+    const user = await requireStudent(request);
     const attempts = await prisma.quizAttempt.findMany({
       where: { studentId: user.id, status: { in: ["SUBMITTED", "AUTO_SUBMITTED"] } },
       include: {

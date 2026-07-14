@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, LoaderCircle, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, FileText, LoaderCircle, Sparkles, Upload, Wand2, X } from "lucide-react";
 import { Badge, ToggleSwitch } from "@/components/ui";
 import { aiApi } from "@/lib/apiClient";
 import type {
@@ -9,9 +9,11 @@ import type {
   AiBloomLevel,
   AiDifficulty,
   AiDraftQuestion,
+  AiProviderMetadata,
   AiQuestionType,
   AiTone,
-  AiQuizGenerationOutput
+  AiQuizGenerationOutput,
+  ParsedMaterialResult
 } from "@/lib/services/aiQuizGenerationService";
 
 const GENERATION_STEPS = [
@@ -26,6 +28,7 @@ const QUESTION_TYPES: AiQuestionType[] = ["MCQ Single", "MCQ Multiple", "True/Fa
 const DIFFICULTIES: AiDifficulty[] = ["Easy", "Medium", "Hard", "Mixed"];
 const BLOOM_LEVELS: AiBloomLevel[] = ["Recall", "Understanding", "Application", "Analysis"];
 const TONES: AiTone[] = ["Simple", "Exam-focused", "Conceptual", "Placement prep"];
+const SUPPORTED_UPLOAD_TYPES = ".txt,.md,.markdown,.pdf,.docx,.pptx";
 
 type Props = {
   open: boolean;
@@ -69,6 +72,49 @@ function derivePreview(notes: string) {
   ).slice(0, 8);
 }
 
+function getProviderStatus(provider?: AiProviderMetadata) {
+  if (!provider) {
+    return {
+      label: "Provider selected after generation",
+      tone: "amber" as const
+    };
+  }
+
+  if (provider.usedFallback) {
+    return {
+      label: "Claude unavailable - mock fallback used",
+      tone: "amber" as const
+    };
+  }
+
+  if (provider.provider === "claude") {
+    return {
+      label: "Claude connected",
+      tone: "green" as const
+    };
+  }
+
+  return {
+    label: "Mock AI mode",
+    tone: "blue" as const
+  };
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function parserLabel(parser: ParsedMaterialResult["parser"]) {
+  if (parser === "txt") return "TXT parser";
+  if (parser === "markdown") return "Markdown parser";
+  if (parser === "pdf") return "PDF parser";
+  if (parser === "docx") return "Word parser";
+  if (parser === "pptx") return "PowerPoint parser";
+  return "Unsupported";
+}
+
 export function AiQuizAgentPanel({
   open,
   mode,
@@ -86,11 +132,13 @@ export function AiQuizAgentPanel({
   onSaveQuestionsToBank,
   insertButtonLabel
 }: Props) {
-  const [activeTab, setActiveTab] = useState(initialOpenTab);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeTab, setActiveTab] = useState<"topic" | "notes" | "upload">(initialOpenTab === "upload" ? "upload" : initialOpenTab === "notes" ? "notes" : "topic");
   const [topic, setTopic] = useState(initialTopic);
   const [subject, setSubject] = useState(initialSubject);
   const [classId, setClassId] = useState(initialClassId);
   const [pastedNotes, setPastedNotes] = useState("");
+  const [parsedMaterial, setParsedMaterial] = useState<ParsedMaterialResult | null>(null);
   const [questionCount, setQuestionCount] = useState(initialQuestionCount);
   const [questionTypes, setQuestionTypes] = useState<AiQuestionType[]>(["MCQ Single", "MCQ Multiple", "True/False"]);
   const [difficulty, setDifficulty] = useState<AiDifficulty>(initialDifficulty);
@@ -106,6 +154,7 @@ export function AiQuizAgentPanel({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -115,11 +164,20 @@ export function AiQuizAgentPanel({
     setStatusText("");
     setEditingId(null);
     setSelectedIds([]);
+    setParsedMaterial(null);
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }, [open]);
 
   useEffect(() => {
     setTopic(initialTopic);
   }, [initialTopic]);
+
+  useEffect(() => {
+    setActiveTab(initialOpenTab === "upload" ? "upload" : initialOpenTab === "notes" ? "notes" : "topic");
+  }, [initialOpenTab]);
 
   useEffect(() => {
     if (!loading) return;
@@ -132,11 +190,13 @@ export function AiQuizAgentPanel({
     return () => window.clearInterval(handle);
   }, [loading]);
 
-  const previewKeywords = useMemo(() => derivePreview(pastedNotes), [pastedNotes]);
+  const previewSource = parsedMaterial?.extractedText ?? pastedNotes;
+  const previewKeywords = useMemo(() => derivePreview(previewSource), [previewSource]);
   const draftQuestions = result?.questions ?? [];
   const tooShortNotes = pastedNotes.trim().length > 0 && pastedNotes.trim().length < 80;
   const activeModeLabel = mode === "question-bank" ? "question bank" : mode === "analytics-remedial" ? "remedial quiz" : "quiz builder";
   const primaryInsertLabel = insertButtonLabel ?? (mode === "question-bank" ? "Save selected to Question Bank" : "Insert selected");
+  const providerStatus = getProviderStatus(result?.provider);
 
   function toggleQuestionType(type: AiQuestionType) {
     setQuestionTypes((current) => current.includes(type) ? current.filter((value) => value !== type) : [...current, type]);
@@ -169,8 +229,8 @@ export function AiQuizAgentPanel({
   }
 
   function getPayload() {
-    if (!topic.trim() && !pastedNotes.trim()) {
-      throw new Error("Topic or pasted notes are required.");
+    if (!topic.trim() && !pastedNotes.trim() && !parsedMaterial?.extractedText.trim()) {
+      throw new Error("Add a topic, paste notes, or upload material before generating AI drafts.");
     }
     if (questionCount < 1 || questionCount > 30) {
       throw new Error("Question count must be between 1 and 30.");
@@ -186,6 +246,19 @@ export function AiQuizAgentPanel({
       mode,
       topic,
       pastedNotes,
+      materialText: parsedMaterial?.extractedText,
+      materialMetadata: parsedMaterial
+        ? {
+            materialId: parsedMaterial.materialId,
+            fileName: parsedMaterial.fileName,
+            fileType: parsedMaterial.fileType,
+            fileSize: parsedMaterial.fileSize,
+            extractedCharCount: parsedMaterial.extractedCharCount,
+            parser: parsedMaterial.parser,
+            confidence: parsedMaterial.confidence,
+            previewText: parsedMaterial.previewText
+          }
+        : undefined,
       subject,
       classId: classId || undefined,
       questionCount,
@@ -256,6 +329,42 @@ export function AiQuizAgentPanel({
     setSuccess("AI-drafted questions saved to Question Bank.");
   }
 
+  async function handleUpload(file: File) {
+    setError(null);
+    setSuccess(null);
+    setUploading(true);
+
+    try {
+      const parsed = await aiApi.parseMaterial(file);
+      setParsedMaterial(parsed);
+      setActiveTab("upload");
+      setSuccess(`${parsed.fileName} was parsed successfully. Review the preview, then generate AI drafts.`);
+    } catch (uploadError) {
+      setParsedMaterial(null);
+      setError(uploadError instanceof Error ? uploadError.message : "Material upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await handleUpload(file);
+  }
+
+  function openFilePicker() {
+    fileInputRef.current?.click();
+  }
+
+  function clearMaterial() {
+    setParsedMaterial(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setSuccess("Uploaded material cleared.");
+  }
+
   if (!open) return null;
 
   return (
@@ -264,10 +373,11 @@ export function AiQuizAgentPanel({
         <div className="section-head">
           <div>
             <h2 id="ai-agent-title">AI Quiz-Generation Agent</h2>
-            <p className="muted">Draft questions from a topic or notes. Professor review required.</p>
+            <p className="muted">Draft questions from a topic, notes, or uploaded material. Professor review required.</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Badge tone="amber">AI-drafted · Review before publishing</Badge>
+            <Badge tone={providerStatus.tone}>{providerStatus.label}</Badge>
             <button className="icon-button" onClick={onClose} type="button" aria-label="Close AI panel"><X size={16} /></button>
           </div>
         </div>
@@ -278,7 +388,7 @@ export function AiQuizAgentPanel({
               {[
                 { id: "topic", label: "Topic Prompt" },
                 { id: "notes", label: "Paste Notes" },
-                { id: "upload", label: "Upload Material Coming Soon" }
+                { id: "upload", label: "Upload Material" }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -337,17 +447,115 @@ export function AiQuizAgentPanel({
             ) : null}
 
             {activeTab === "upload" ? (
-              <div className="ai-upload-card">
-                <Upload size={26} />
-                <strong>Upload material is coming soon</strong>
-                <p className="muted">Accepted file types: PDF, DOCX, PPTX, TXT. File parsing is not implemented in this phase.</p>
+              <div className="soft-panel pad-sm grid">
+                <input
+                  ref={fileInputRef}
+                  accept={SUPPORTED_UPLOAD_TYPES}
+                  onChange={handleFileChange}
+                  style={{ display: "none" }}
+                  type="file"
+                />
+
+                <div className="notice ai-privacy-copy">
+                  Uploaded material is parsed to draft questions. Files are not permanently stored in this MVP. Do not upload confidential or sensitive student data.
+                </div>
+
+                <div className="card pad-sm grid">
+                  <div className="section-head">
+                    <div>
+                      <strong>Supported now</strong>
+                      <div className="muted small">TXT, MD, PDF, DOCX, PPTX up to 5MB</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Badge tone="green">TXT</Badge>
+                      <Badge tone="green">MD</Badge>
+                      <Badge tone="green">MARKDOWN</Badge>
+                      <Badge tone="green">PDF</Badge>
+                      <Badge tone="green">DOCX</Badge>
+                      <Badge tone="green">PPTX</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {!parsedMaterial ? (
+                  <div className="ai-upload-card">
+                    <Upload size={26} />
+                    <strong>Upload material for parsing</strong>
+                    <p className="muted">Choose a text, PDF, Word, or PowerPoint file to extract text, preview it, and use it for AI drafting.</p>
+                    <button className="btn primary" onClick={openFilePicker} type="button" disabled={uploading}>
+                      {uploading ? "Parsing..." : "Choose File"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="card pad grid">
+                    <div className="section-head">
+                      <div>
+                        <h3>{parsedMaterial.fileName}</h3>
+                        <p className="muted small">Review the extracted text before using it for quiz generation.</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <Badge tone="blue">{parserLabel(parsedMaterial.parser)}</Badge>
+                        <Badge tone="green">{parsedMaterial.confidence} confidence</Badge>
+                        <Badge tone="amber">{formatFileSize(parsedMaterial.fileSize)}</Badge>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Badge tone="purple">{parsedMaterial.fileType || "text/plain"}</Badge>
+                      <Badge tone="blue">{parsedMaterial.extractedCharCount} characters</Badge>
+                    </div>
+
+                    <div className="soft-panel pad-sm">
+                      <strong>Extracted text preview</strong>
+                      <p className="muted small" style={{ whiteSpace: "pre-wrap", marginTop: 10 }}>{parsedMaterial.previewText}</p>
+                    </div>
+
+                    <div className="card pad-sm">
+                      <strong>Parsed preview keywords</strong>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                        {previewKeywords.length
+                          ? previewKeywords.map((keyword) => <Badge key={keyword} tone="blue">{keyword}</Badge>)
+                          : <span className="muted small">Keywords will appear here when enough text is extracted.</span>}
+                      </div>
+                    </div>
+
+                    {parsedMaterial.warnings.length ? (
+                      <div className="grid">
+                        {parsedMaterial.warnings.map((warning) => (
+                          <div className="row-item" key={warning} style={{ padding: 10 }}>
+                            <AlertTriangle size={16} color="var(--amber)" />
+                            <span className="small">{warning}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        className="btn primary"
+                        onClick={() => {
+                          setActiveTab("upload");
+                          setSuccess("Uploaded material will be used when you generate AI drafts.");
+                        }}
+                        type="button"
+                      >
+                        Use This Material for Generation
+                      </button>
+                      <button className="btn" onClick={openFilePicker} type="button" disabled={uploading}>Replace File</button>
+                      <button className="btn ghost" onClick={clearMaterial} type="button">Clear Material</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
 
             <div className="card pad grid">
               <div className="section-head">
                 <h3>Generation controls</h3>
-                <Badge tone="purple"><Wand2 size={14} /> Mock AI workflow</Badge>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Badge tone="purple"><Wand2 size={14} /> Guided AI drafting</Badge>
+                  <Badge tone={providerStatus.tone}>{providerStatus.label}</Badge>
+                </div>
               </div>
 
               <div className="grid grid-3">
@@ -402,7 +610,7 @@ export function AiQuizAgentPanel({
                   <div className="ai-meta-row">
                     <div>
                       <strong>Avoid near-duplicates from Question Bank</strong>
-                      <div className="muted small">Mock-only signal for this phase.</div>
+                      <div className="muted small">Uses the current demo question bank as a drafting guardrail.</div>
                     </div>
                     <ToggleSwitch checked={avoidDuplicates} onClick={() => setAvoidDuplicates((value) => !value)} />
                   </div>
@@ -421,7 +629,7 @@ export function AiQuizAgentPanel({
               </div>
 
               <div className="notice ai-privacy-copy">
-                Pasted or uploaded material is used only to draft questions. Review AI output before publishing.
+                Pasted or uploaded material is used only to draft questions. Files are parsed for quiz drafting and are not permanently stored in this MVP. AI-drafted content requires professor review before publishing.
               </div>
 
               {error ? <div className="notice" style={{ borderColor: "#ffcad8", background: "#fff1f6", color: "#a41f5a" }}>{error}</div> : null}
@@ -429,10 +637,14 @@ export function AiQuizAgentPanel({
 
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div className="muted small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {loading ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />}
-                  {loading ? statusText : `Draft into ${activeModeLabel} mode with review guardrails.`}
+                  {loading || uploading ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />}
+                  {uploading
+                    ? "Parsing uploaded material..."
+                    : loading
+                      ? statusText
+                      : `Draft into ${activeModeLabel} mode with review guardrails.`}
                 </div>
-                <button className="btn primary" onClick={handleGenerate} type="button" disabled={loading}>
+                <button className="btn primary" onClick={handleGenerate} type="button" disabled={loading || uploading}>
                   {loading ? "Generating..." : "Generate"}
                 </button>
               </div>
@@ -454,6 +666,7 @@ export function AiQuizAgentPanel({
                   <div className="soft-panel pad-sm">
                     <strong>{result.summary}</strong>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                      <Badge tone={providerStatus.tone}>{providerStatus.label}</Badge>
                       {result.coverage.map((item) => <Badge key={item}>{item}</Badge>)}
                       <Badge tone="amber">{result.estimatedDifficulty}</Badge>
                       <Badge tone="green">{result.suggestedTimeMinutes} min suggested</Badge>
@@ -543,6 +756,7 @@ export function AiQuizAgentPanel({
                               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                                 <Badge tone="purple">Marks: {question.marks}</Badge>
                                 <Badge tone="amber">AI-drafted</Badge>
+                                {question.source === "Based on uploaded material" ? <Badge tone="blue"><FileText size={14} /> Uploaded material</Badge> : null}
                               </div>
                             </div>
                           )}
@@ -567,7 +781,7 @@ export function AiQuizAgentPanel({
                   <CheckCircle2 size={20} color="var(--purple)" />
                   <div>
                     <strong>No AI drafts yet</strong>
-                    <p className="muted small">Generate from a topic prompt or pasted notes to begin the review workflow.</p>
+                    <p className="muted small">Generate from a topic prompt, pasted notes, or uploaded material to begin the review workflow.</p>
                   </div>
                 </div>
               )}

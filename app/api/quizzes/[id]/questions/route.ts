@@ -6,7 +6,7 @@ import { validateQuestionInput } from "@/lib/validation";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({
       where: { id: params.id },
       include: { questions: true }

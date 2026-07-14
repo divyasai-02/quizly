@@ -92,3 +92,32 @@ export function mapQuizDetail(quiz: QuizWithQuestions) {
     ]
   };
 }
+
+export function mapQuizForStudent(quiz: QuizWithQuestions) {
+  return {
+    ...mapQuizSummary(quiz),
+    questionsList: quiz.questions.map((question) => {
+      const mapped = mapQuestion(question);
+      return {
+        id: mapped.id,
+        type: mapped.type,
+        text: mapped.text,
+        options: mapped.options,
+        optionIds: mapped.optionIds,
+        marks: mapped.marks,
+        minutes: mapped.minutes,
+        seconds: mapped.seconds,
+        required: mapped.required,
+        shuffle: mapped.shuffle
+      };
+    }),
+    instructions: [
+      "Read each question carefully before answering.",
+      "You can navigate between questions.",
+      "You can mark questions for review.",
+      "Your progress will be auto-saved.",
+      "Do not refresh or close the tab during the quiz.",
+      "The quiz will be auto-submitted when time runs out."
+    ]
+  };
+}

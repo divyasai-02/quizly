@@ -8,12 +8,43 @@ import { adminApi } from "@/lib/apiClient";
 export default function AdminClassroomPage() {
   const [data, setData] = useState<any | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: "", professorId: "", section: "", subject: "" });
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     adminApi.classes()
       .then(setData)
-      .catch(() => setData({ classes: [] }));
+      .catch(() => setData({ classes: [], professors: [] }));
   }, []);
+
+  function openClassroom(classroom: any) {
+    setSelected(classroom);
+    setForm({
+      name: classroom.name ?? "",
+      professorId: classroom.professorId ?? "",
+      section: classroom.section ?? "",
+      subject: classroom.subject ?? ""
+    });
+    setNotice(null);
+  }
+
+  async function saveClassroom() {
+    if (!selected) return;
+    setSaving(true);
+    setNotice(null);
+    try {
+      const payload = await adminApi.updateClass(selected.id, form);
+      setData(payload);
+      const updated = payload.classes.find((item: any) => item.id === selected.id);
+      setSelected(updated ?? null);
+      setNotice("Classroom updated.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Classroom update failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <AppShell title="Classroom Oversight" subtitle="Review every class, its ownership, learner load, assessment volume, and recent movement.">
@@ -38,7 +69,7 @@ export default function AdminClassroomPage() {
                     <div className="soft-panel pad-sm"><span className="muted small">Quizzes</span><strong style={{ display: "block" }}>{classroom.quizCount}</strong></div>
                   </div>
                   <p className="muted small" style={{ marginTop: 12 }}>{classroom.recentActivity}</p>
-                  <button className="btn primary" onClick={() => setSelected(classroom)} style={{ marginTop: 12 }} type="button">Manage</button>
+                  <button className="btn primary" onClick={() => openClassroom(classroom)} style={{ marginTop: 12 }} type="button">Manage</button>
                 </section>
               ))}
             </div>
@@ -67,7 +98,7 @@ export default function AdminClassroomPage() {
                       <td>{classroom.averagePerformance}%</td>
                       <td>{classroom.recentActivity}</td>
                       <td>{classroom.updatedAt}</td>
-                      <td><button className="btn" onClick={() => setSelected(classroom)} type="button">Manage</button></td>
+                      <td><button className="btn" onClick={() => openClassroom(classroom)} type="button">Manage</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -82,7 +113,7 @@ export default function AdminClassroomPage() {
               <div className="section-head">
                 <div>
                   <h2 id="classroom-manage-title">{selected.name}</h2>
-                  <p className="muted small">{selected.subject} · Managed by {selected.professor}</p>
+                  <p className="muted small">{selected.subject} - Managed by {selected.professor}</p>
                 </div>
                 <button className="btn" onClick={() => setSelected(null)} type="button">Close</button>
               </div>
@@ -96,10 +127,34 @@ export default function AdminClassroomPage() {
                 <strong>Recent Activity</strong>
                 <p className="muted small">{selected.recentActivity}</p>
               </section>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="btn primary" disabled type="button">Reassign Professor - Coming Soon</button>
-                <button className="btn" disabled type="button">Class Actions - Coming Soon</button>
-              </div>
+              <section className="soft-panel pad-sm grid">
+                <strong>Classroom Controls</strong>
+                <div className="grid grid-2">
+                  <label>
+                    <span className="muted small">Class name</span>
+                    <input className="input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+                  </label>
+                  <label>
+                    <span className="muted small">Subject</span>
+                    <input className="input" value={form.subject} onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))} />
+                  </label>
+                  <label>
+                    <span className="muted small">Section</span>
+                    <input className="input" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))} />
+                  </label>
+                  <label>
+                    <span className="muted small">Professor</span>
+                    <select className="select" value={form.professorId} onChange={(event) => setForm((current) => ({ ...current, professorId: event.target.value }))}>
+                      {(data?.professors ?? []).map((professor: any) => <option key={professor.id} value={professor.id}>{professor.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className="btn primary" onClick={saveClassroom} disabled={saving} type="button">{saving ? "Saving..." : "Save Classroom"}</button>
+                  <button className="btn" onClick={() => openClassroom(selected)} disabled={saving} type="button">Reset</button>
+                </div>
+              </section>
+              {notice ? <div className="notice">{notice}</div> : null}
             </div>
           </div>
         ) : null}

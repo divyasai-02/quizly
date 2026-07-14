@@ -40,6 +40,7 @@ export default function ProfessorReportsPage() {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dismissedReportIds, setDismissedReportIds] = useState<string[]>([]);
 
   const query = useMemo(() => toQueryString(filters), [filters]);
 
@@ -51,14 +52,14 @@ export default function ProfessorReportsPage() {
       .finally(() => setLoading(false));
   }, [query]);
 
-  function downloadCsv(type: string) {
-    const path = type === "quizResults"
-      ? "/api/reports/quiz-results"
-      : type === "studentProgress"
-        ? "/api/reports/student-progress"
-        : "/api/reports/question-difficulty";
-    window.open(`${path}${query ? `${query}&format=csv` : "?format=csv"}`, "_blank");
+  function downloadReport(type: string, format: "csv" | "pdf" | "excel" = "csv") {
+    const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+    params.set("reportType", type);
+    params.set("format", format);
+    window.open(`/api/reports/export?${params.toString()}`, "_blank");
   }
+
+  const visibleRecentReports = (data?.recentReports ?? []).filter((report: any) => !dismissedReportIds.includes(report.id));
 
   function renderTable(rows: any[]) {
     if (!rows.length) {
@@ -151,13 +152,9 @@ export default function ProfessorReportsPage() {
                   </div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
                     <button className="btn primary" onClick={() => setFilters((current) => ({ ...current, reportType: card.key }))} type="button"><Eye size={16} />View Preview</button>
-                    {card.enabledExports.includes("CSV") ? (
-                      <button className="btn" onClick={() => downloadCsv(card.key)} type="button"><Download size={16} />Export CSV</button>
-                    ) : (
-                      <button className="btn" disabled type="button"><FileSpreadsheet size={16} />CSV Coming Soon</button>
-                    )}
-                    <button className="btn" disabled type="button">PDF Coming Soon</button>
-                    <button className="btn" disabled type="button">Excel Coming Soon</button>
+                    <button className="btn" onClick={() => downloadReport(card.key, "csv")} type="button"><Download size={16} />Export CSV</button>
+                    <button className="btn" onClick={() => downloadReport(card.key, "pdf")} type="button">Export PDF</button>
+                    <button className="btn" onClick={() => downloadReport(card.key, "excel")} type="button"><FileSpreadsheet size={16} />Export Excel</button>
                   </div>
                 </section>
               ))}
@@ -182,7 +179,7 @@ export default function ProfessorReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(data?.recentReports ?? []).map((report: any) => (
+                    {visibleRecentReports.map((report: any) => (
                       <tr key={report.id}>
                         <td><strong>{report.name}</strong></td>
                         <td>{report.type}</td>
@@ -193,14 +190,15 @@ export default function ProfessorReportsPage() {
                         <td>
                           <div className="table-actions">
                             <button className="linkish" onClick={() => setFilters((current) => ({ ...current, reportType: report.name.includes("Class") ? "classPerformance" : report.name.includes("Student") ? "studentProgress" : report.name.includes("Question") ? "questionDifficulty" : report.name.includes("Weak") ? "weakTopics" : report.name.includes("Engagement") ? "engagement" : "quizResults" }))} type="button">View</button>
-                            <button className="linkish" onClick={() => report.name.includes("Student") ? downloadCsv("studentProgress") : report.name.includes("Question") ? downloadCsv("questionDifficulty") : downloadCsv("quizResults")} type="button">Download</button>
-                            <button className="linkish" disabled type="button">Delete</button>
+                            <button className="linkish" onClick={() => downloadReport(report.name.includes("Class") ? "classPerformance" : report.name.includes("Student") ? "studentProgress" : report.name.includes("Question") ? "questionDifficulty" : report.name.includes("Weak") ? "weakTopics" : report.name.includes("Engagement") ? "engagement" : "quizResults", "csv")} type="button">Download</button>
+                            <button className="linkish" onClick={() => setDismissedReportIds((current) => [...current, report.id])} type="button">Delete</button>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {!visibleRecentReports.length ? <div className="pad"><p className="muted">No recent report history is visible.</p></div> : null}
               </section>
 
               <section className="card pad">

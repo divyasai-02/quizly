@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
+import { requireStudent } from "@/lib/serverSession";
 import { mapQuizDetail, quizInclude } from "@/lib/quizTransforms";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    const user = await requireStudent(request);
     const attempt = await prisma.quizAttempt.findUniqueOrThrow({
       where: { id: params.id },
       include: {
@@ -11,6 +13,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         quiz: { include: quizInclude }
       }
     });
+
+    if (attempt.studentId !== user.id) {
+      throw new Error("You can only access your own attempts.");
+    }
+
     return json({
       id: attempt.id,
       status: attempt.status,

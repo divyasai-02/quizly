@@ -4,7 +4,7 @@ import { requireProfessor } from "@/lib/serverSession";
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const classrooms = await prisma.classroom.findMany({
       where: { professorId: user.id },
       include: {
@@ -38,13 +38,22 @@ export async function GET(request: Request) {
     });
 
     const attempts = classrooms.flatMap((classroom) => classroom.quizzes.flatMap((quiz) => quiz.attempts.map((attempt) => ({ ...attempt, className: classroom.name }))));
-    const studentPerformance = attempts.map((attempt, index) => ({
+    const studentPerformance = classrooms.flatMap((classroom) =>
+      classroom.quizzes.flatMap((quiz) =>
+        quiz.attempts.map((attempt) => ({
+          student: attempt.student.name,
+          className: classroom.name,
+          quizTitle: quiz.title,
+          avgScore: Math.round(attempt.percentage),
+          accuracy: Math.round(attempt.percentage),
+          quizzes: 1
+        }))
+      )
+    )
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .map((attempt, index) => ({
       rank: index + 1,
-      student: attempt.student.name,
-      className: attempt.className,
-      avgScore: Math.round(attempt.percentage),
-      accuracy: Math.round(attempt.percentage),
-      quizzes: 1
+      ...attempt
     }));
 
     const allQuestions = classrooms.flatMap((classroom) =>
@@ -57,6 +66,8 @@ export async function GET(request: Request) {
           return {
             question: `Q${index + 1}. ${question.topicTag ?? quiz.topic}`,
             topic: question.topicTag ?? quiz.topic,
+            className: classroom.name,
+            quizTitle: quiz.title,
             correct,
             incorrect: total ? 100 - correct : 0,
             time: `${question.timeLimitSeconds ?? 60} sec`,
@@ -85,6 +96,7 @@ export async function GET(request: Request) {
     const overallAverage = classOverview.length ? Math.round(classOverview.reduce((sum, item) => sum + item.score, 0) / classOverview.length) : 0;
     return json({
       classOverview,
+      quizzes: classrooms.flatMap((classroom) => classroom.quizzes.map((quiz) => ({ id: quiz.id, title: quiz.title, className: classroom.name }))),
       studentPerformance,
       questionAnalysis,
       overallAverage,

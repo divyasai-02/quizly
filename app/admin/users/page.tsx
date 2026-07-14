@@ -12,6 +12,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [selected, setSelected] = useState<any | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     adminApi.users()
@@ -30,7 +31,7 @@ export default function AdminUsersPage() {
   }, [data, roleFilter, search, statusFilter]);
 
   return (
-    <AppShell title="Users" subtitle="Review account mix, inspect profile context, and keep guardrails visible before real user management ships.">
+    <AppShell title="Users" subtitle="Review account mix, inspect profile context, and manage role or access changes.">
       <div className="content grid">
         <div className="section-head">
           <h2>User Directory</h2>
@@ -51,6 +52,7 @@ export default function AdminUsersPage() {
               <option>Quiet</option>
               <option>Needs onboarding</option>
               <option>Platform Admin</option>
+              <option>Deactivated</option>
             </select>
           </div>
         </div>
@@ -83,12 +85,12 @@ export default function AdminUsersPage() {
                     <td>{user.joinedDate}</td>
                     <td>{user.classesOrEnrollments}</td>
                     <td>{user.quizzesOrAttempts}</td>
-                    <td><Badge tone={user.status === "Active" ? "green" : user.status === "Platform Admin" ? "purple" : "amber"}>{user.status}</Badge></td>
+                    <td><Badge tone={user.status === "Active" ? "green" : user.status === "Platform Admin" ? "purple" : user.status === "Deactivated" ? "pink" : "amber"}>{user.status}</Badge></td>
                     <td>
                       <div className="table-actions">
                         <button className="linkish" onClick={() => setSelected(user)} type="button">View</button>
-                        <button className="linkish" disabled type="button">Change Role</button>
-                        <button className="linkish" disabled type="button">Deactivate</button>
+                        <button className="linkish" onClick={() => setSelected(user)} type="button">Change Role</button>
+                        <button className="linkish" onClick={() => setSelected(user)} type="button">{user.disabledAt ? "Reactivate" : "Deactivate"}</button>
                       </div>
                     </td>
                   </tr>
@@ -97,6 +99,8 @@ export default function AdminUsersPage() {
             </table>
           </section>
         )}
+
+        {actionNotice ? <div className="notice">{actionNotice}</div> : null}
 
         {selected ? (
           <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
@@ -122,14 +126,67 @@ export default function AdminUsersPage() {
                 <strong>Profile Summary</strong>
                 <p className="muted small">{selected.profile.summary}</p>
               </section>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="btn primary" disabled type="button">Change Role - Coming Soon</button>
-                <button className="btn" disabled type="button">Suspend / Deactivate - Coming Soon</button>
-              </div>
+              <AdminUserActions
+                selected={selected}
+                onUpdated={(payload) => {
+                  setData(payload);
+                  const updated = payload.users.find((user: any) => user.id === selected.id);
+                  setSelected(updated ?? null);
+                  setActionNotice(`${selected.name} was updated.`);
+                }}
+                onNotice={setActionNotice}
+              />
             </div>
           </div>
         ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function AdminUserActions({ selected, onNotice, onUpdated }: { selected: any; onNotice: (message: string | null) => void; onUpdated: (payload: any) => void }) {
+  const [role, setRole] = useState(selected.role);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setRole(selected.role);
+  }, [selected.id, selected.role]);
+
+  async function runAction(input: { action: "changeRole" | "deactivate" | "reactivate"; role?: string }) {
+    setBusy(true);
+    onNotice(null);
+    try {
+      const payload = await adminApi.updateUser(selected.id, input);
+      onUpdated(payload);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "User action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="soft-panel pad-sm grid">
+      <div className="section-head">
+        <div>
+          <strong>Account Controls</strong>
+          <p className="muted small">Apply persistent user role and access changes.</p>
+        </div>
+        <Badge tone={selected.disabledAt ? "pink" : "green"}>{selected.disabledAt ? "Deactivated" : "Enabled"}</Badge>
+      </div>
+      <div className="toolbar-inline">
+        <select className="select" value={role} onChange={(event) => setRole(event.target.value)} disabled={busy}>
+          <option>PROFESSOR</option>
+          <option>STUDENT</option>
+          <option>ADMIN</option>
+        </select>
+        <button className="btn primary" onClick={() => runAction({ action: "changeRole", role })} disabled={busy || role === selected.role} type="button">Apply Role</button>
+        {selected.disabledAt ? (
+          <button className="btn" onClick={() => runAction({ action: "reactivate" })} disabled={busy} type="button">Reactivate</button>
+        ) : (
+          <button className="btn" onClick={() => runAction({ action: "deactivate" })} disabled={busy} type="button">Deactivate</button>
+        )}
+      </div>
+    </div>
   );
 }

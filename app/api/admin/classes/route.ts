@@ -5,9 +5,14 @@ import { buildAdminClassesView, loadReportingDataset } from "@/lib/services/repo
 
 export async function GET(request: Request) {
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
     const dataset = await loadReportingDataset(prisma);
-    return json({ classes: buildAdminClassesView(dataset) });
+    return json({
+      classes: buildAdminClassesView(dataset),
+      professors: dataset.users
+        .filter((user) => user.role === "PROFESSOR" && !user.disabledAt)
+        .map((user) => ({ id: user.id, name: user.name, email: user.email }))
+    });
   } catch (error) {
     return errorResponse(error);
   }

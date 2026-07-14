@@ -12,8 +12,14 @@ function readDatabaseUrlFromEnvFile() {
 
 function resolveSqlitePath() {
   const databaseUrl = process.env.DATABASE_URL?.trim() || readDatabaseUrlFromEnvFile();
-  if (!databaseUrl || !databaseUrl.startsWith("file:")) {
+  if (!databaseUrl) {
     return resolve(process.cwd(), "dev.db");
+  }
+
+  if (!databaseUrl.startsWith("file:")) {
+    console.error("SQLite legacy bootstrap only supports file: DATABASE_URL values.");
+    console.error("Use npm run db:migrate:dev against PostgreSQL for the standard local workflow.");
+    process.exit(1);
   }
 
   const relativePath = databaseUrl.slice("file:".length);

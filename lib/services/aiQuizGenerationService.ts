@@ -1,428 +1,40 @@
-import { AIInsightType } from "@prisma/client";
+import { AIInsightType, NotificationType, UserRole } from "@prisma/client";
 import type { QuizQuestion } from "@/data/mockData";
 import { prisma } from "@/lib/prisma";
+import { createNotification, createRoleNotifications } from "@/lib/services/notificationService";
+import { resolveAiProviders } from "@/lib/services/ai/providers/aiProviderFactory";
+import type {
+  AiAgentMode,
+  AiBloomLevel,
+  AiDifficulty,
+  AiDraftQuestion,
+  AiExplanationOutput,
+  AiUploadedMaterialMetadata,
+  AiProviderMetadata,
+  AiQuestionImprovementOutput,
+  ParsedMaterialResult,
+  AiQuestionType,
+  AiQuizGenerationInput,
+  AiQuizGenerationOutput,
+  AiTone
+} from "@/lib/services/ai/types";
+import { truncateForAudit, validateExplanationPayload, validateQuestionImprovementPayload, validateQuizDraftPayload, sanitizeAiQuizGenerationInput } from "@/lib/services/ai/validation";
 
-export type AiAgentMode = "quiz-builder" | "question-bank" | "analytics-remedial";
-export type AiQuestionType = "MCQ Single" | "MCQ Multiple" | "True/False" | "Short Answer" | "Fill in the Blank";
-export type AiDifficulty = "Easy" | "Medium" | "Hard" | "Mixed";
-export type AiBloomLevel = "Recall" | "Understanding" | "Application" | "Analysis";
-export type AiTone = "Simple" | "Exam-focused" | "Conceptual" | "Placement prep";
-
-export type AiQuizGenerationInput = {
-  mode: AiAgentMode;
-  topic?: string;
-  pastedNotes?: string;
-  subject?: string;
-  classId?: string;
-  questionCount?: number;
-  questionTypes?: AiQuestionType[];
-  difficulty?: AiDifficulty;
-  bloomLevel?: AiBloomLevel;
-  marksPerQuestion?: number;
-  negativeMarking?: boolean;
-  tone?: AiTone;
-  avoidQuestionBankDuplicates?: boolean;
-  userId?: string;
-};
-
-export type AiDraftQuestion = {
-  tempId: string;
-  type: AiQuestionType;
-  text: string;
-  options: Array<{ id: string; text: string }>;
-  correctOptionIds?: string[];
-  correctAnswer?: string;
-  explanation: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  topicTag: string;
-  marks: number;
-  confidence: number;
-  source: "Based on topic prompt" | "Based on pasted notes" | "General knowledge - review carefully";
-  aiGenerated: true;
-};
-
-export type AiQuizGenerationOutput = {
-  generationId: string;
-  summary: string;
-  warnings: string[];
-  coverage: string[];
-  estimatedDifficulty: "Easy" | "Medium" | "Hard" | "Mixed";
-  suggestedTimeMinutes: number;
-  questions: AiDraftQuestion[];
-};
-
-type NormalizedInput = Required<Pick<AiQuizGenerationInput, "mode" | "questionCount" | "questionTypes" | "difficulty" | "bloomLevel" | "marksPerQuestion" | "negativeMarking" | "tone" | "avoidQuestionBankDuplicates">> &
-  Pick<AiQuizGenerationInput, "topic" | "pastedNotes" | "subject" | "classId" | "userId">;
-
-type TopicBlueprint = {
-  coverage: string[];
-  stems: Array<{
-    topicTag: string;
-    type: AiQuestionType;
-    text: string;
-    options?: string[];
-    correctIndexes?: number[];
-    correctAnswer?: string;
-    explanation: string;
-    difficulty?: "Easy" | "Medium" | "Hard";
-  }>;
-};
-
-const DEFAULT_TYPES: AiQuestionType[] = ["MCQ Single", "True/False", "Short Answer"];
-
-function createGenerationId() {
-  return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function truncateForAudit(value?: string, max = 500) {
-  if (!value) return value;
-  if (value.length <= max) return value;
-  return `${value.slice(0, max)}... [truncated for retention review]`;
-}
-
-function sanitizeInput(input: AiQuizGenerationInput): NormalizedInput {
-  const topic = input.topic?.trim();
-  const pastedNotes = input.pastedNotes?.trim();
-  if (!topic && !pastedNotes) {
-    throw new Error("Enter a topic or paste notes before generating AI drafts.");
-  }
-
-  const questionCount = input.questionCount ?? 8;
-  if (questionCount < 1 || questionCount > 30) {
-    throw new Error("Question count must be between 1 and 30.");
-  }
-
-  const marksPerQuestion = input.marksPerQuestion ?? 1;
-  if (marksPerQuestion <= 0) {
-    throw new Error("Marks per question must be positive.");
-  }
-
-  const questionTypes = input.questionTypes?.length ? input.questionTypes : DEFAULT_TYPES;
-  if (!questionTypes.length) {
-    throw new Error("Select at least one question type.");
-  }
-
-  return {
-    mode: input.mode,
-    topic,
-    pastedNotes,
-    subject: input.subject?.trim(),
-    classId: input.classId,
-    questionCount,
-    questionTypes,
-    difficulty: input.difficulty ?? "Mixed",
-    bloomLevel: input.bloomLevel ?? "Understanding",
-    marksPerQuestion,
-    negativeMarking: input.negativeMarking ?? false,
-    tone: input.tone ?? "Conceptual",
-    avoidQuestionBankDuplicates: input.avoidQuestionBankDuplicates ?? true,
-    userId: input.userId
-  };
-}
-
-function deriveKeywords(input: Pick<NormalizedInput, "topic" | "pastedNotes">) {
-  const source = `${input.topic ?? ""} ${input.pastedNotes ?? ""}`.toLowerCase();
-  return Array.from(
-    new Set(
-      source
-        .split(/[^a-z0-9+#.]+/i)
-        .map((value) => value.trim())
-        .filter((value) => value.length >= 4)
-    )
-  ).slice(0, 8);
-}
-
-function detectBlueprint(input: NormalizedInput): TopicBlueprint {
-  const source = `${input.topic ?? ""} ${input.pastedNotes ?? ""}`.toLowerCase();
-
-  if (source.includes("javascript") || source.includes("java script") || source.includes("java ")) {
-    return {
-      coverage: ["Scope", "Hoisting", "Closures", "Execution context"],
-      stems: [
-        {
-          topicTag: "Closures",
-          type: "MCQ Single",
-          text: "Which statement best describes a closure in JavaScript?",
-          options: [
-            "A function bundled with its lexical environment",
-            "A method that closes a browser tab",
-            "A loop that stops automatically",
-            "A variable declared with var"
-          ],
-          correctIndexes: [0],
-          explanation: "Closures keep access to variables from their outer scope even after the outer function finishes."
-        },
-        {
-          topicTag: "Hoisting",
-          type: "True/False",
-          text: "Function declarations are hoisted in JavaScript before code execution begins.",
-          options: ["True", "False"],
-          correctIndexes: [0],
-          explanation: "Function declarations are hoisted with their definitions, unlike function expressions."
-        },
-        {
-          topicTag: "Scope",
-          type: "MCQ Multiple",
-          text: "Which declarations are block-scoped in modern JavaScript?",
-          options: ["let", "const", "var", "function declarations inside a block"],
-          correctIndexes: [0, 1],
-          explanation: "let and const are block-scoped. var is function-scoped."
-        },
-        {
-          topicTag: "Closures",
-          type: "Short Answer",
-          text: "Write one practical use case for closures in JavaScript.",
-          correctAnswer: "Closures are useful for data privacy, callbacks, and maintaining state between function calls.",
-          explanation: "A strong answer mentions preserving state or encapsulating private variables."
-        }
-      ]
-    };
-  }
-
-  if (source.includes("dbms") || source.includes("sql") || source.includes("database")) {
-    return {
-      coverage: ["Normalization", "Joins", "Keys", "Queries"],
-      stems: [
-        {
-          topicTag: "Normalization",
-          type: "MCQ Single",
-          text: "Which normal form removes partial dependency from a table?",
-          options: ["1NF", "2NF", "3NF", "BCNF"],
-          correctIndexes: [1],
-          explanation: "Second Normal Form removes partial dependency from composite keys."
-        },
-        {
-          topicTag: "SQL Joins",
-          type: "MCQ Single",
-          text: "Which SQL clause is used to combine rows from two tables based on a related column?",
-          options: ["JOIN", "GROUP BY", "ORDER BY", "HAVING"],
-          correctIndexes: [0],
-          explanation: "JOIN combines rows using matching values between tables."
-        },
-        {
-          topicTag: "Keys",
-          type: "True/False",
-          text: "A primary key can contain duplicate values.",
-          options: ["True", "False"],
-          correctIndexes: [1],
-          explanation: "Primary keys must be unique and cannot be null."
-        },
-        {
-          topicTag: "Query Writing",
-          type: "Fill in the Blank",
-          text: "Fill in the blank: The SQL clause used to sort rows is ________.",
-          correctAnswer: "ORDER BY",
-          explanation: "ORDER BY sorts query results in ascending or descending order."
-        }
-      ]
-    };
-  }
-
-  if (source.includes("operating system") || source.includes(" os ") || source.endsWith("os") || source.includes("process scheduling")) {
-    return {
-      coverage: ["Scheduling", "Memory management", "Deadlocks", "Processes"],
-      stems: [
-        {
-          topicTag: "Scheduling",
-          type: "MCQ Single",
-          text: "Which scheduling algorithm gives each process a fixed time slice?",
-          options: ["FCFS", "Round Robin", "SJF", "Priority scheduling"],
-          correctIndexes: [1],
-          explanation: "Round Robin assigns CPU time in fixed quanta."
-        },
-        {
-          topicTag: "Deadlocks",
-          type: "True/False",
-          text: "Mutual exclusion is one of the Coffman conditions for deadlock.",
-          options: ["True", "False"],
-          correctIndexes: [0],
-          explanation: "All four Coffman conditions must be present for deadlock to occur."
-        },
-        {
-          topicTag: "Memory management",
-          type: "Short Answer",
-          text: "What problem does paging help reduce in memory management?",
-          correctAnswer: "Paging helps reduce external fragmentation.",
-          explanation: "Paging divides memory into fixed-size pages and frames, which reduces external fragmentation."
-        }
-      ]
-    };
-  }
-
-  if (source.includes("computer network") || source.includes("network") || source.includes("cn ")) {
-    return {
-      coverage: ["OSI model", "Protocols", "Routing", "Error control"],
-      stems: [
-        {
-          topicTag: "OSI model",
-          type: "MCQ Single",
-          text: "Which OSI layer is responsible for logical addressing and routing?",
-          options: ["Transport", "Network", "Data Link", "Session"],
-          correctIndexes: [1],
-          explanation: "The network layer handles logical addressing and path selection."
-        },
-        {
-          topicTag: "Protocols",
-          type: "MCQ Multiple",
-          text: "Which of the following are transport-layer protocols?",
-          options: ["TCP", "UDP", "IP", "HTTP"],
-          correctIndexes: [0, 1],
-          explanation: "TCP and UDP are transport-layer protocols. IP is network-layer and HTTP is application-layer."
-        },
-        {
-          topicTag: "Error control",
-          type: "True/False",
-          text: "Checksums are used to detect transmission errors.",
-          options: ["True", "False"],
-          correctIndexes: [0],
-          explanation: "Checksums help detect corruption in transmitted data."
-        }
-      ]
-    };
-  }
-
-  if (source.includes("aptitude") || source.includes("quant") || source.includes("reasoning")) {
-    return {
-      coverage: ["Percentages", "Ratios", "Series", "Logic"],
-      stems: [
-        {
-          topicTag: "Percentages",
-          type: "MCQ Single",
-          text: "A number increases from 80 to 100. What is the percentage increase?",
-          options: ["20%", "25%", "15%", "30%"],
-          correctIndexes: [1],
-          explanation: "The increase is 20 on a base of 80, so the percentage increase is 25%."
-        },
-        {
-          topicTag: "Series",
-          type: "Fill in the Blank",
-          text: "Fill in the blank: 2, 4, 8, 16, ________",
-          correctAnswer: "32",
-          explanation: "Each term doubles the previous term."
-        },
-        {
-          topicTag: "Logic",
-          type: "True/False",
-          text: "All squares are rectangles.",
-          options: ["True", "False"],
-          correctIndexes: [0],
-          explanation: "A square satisfies all properties of a rectangle."
-        }
-      ]
-    };
-  }
-
-  return {
-    coverage: ["Core ideas", "Definitions", "Applications", "Review points"],
-    stems: [
-      {
-        topicTag: "Core concept",
-        type: "MCQ Single",
-        text: `Which statement best matches the core idea of ${input.topic ?? "the provided topic"}?`,
-        options: ["Concept definition", "Unrelated example", "Historical trivia", "Random formula"],
-        correctIndexes: [0],
-        explanation: "The best answer should directly reflect the main idea of the topic."
-      },
-      {
-        topicTag: "Application",
-        type: "Short Answer",
-        text: `Give one practical application of ${input.topic ?? "the topic"} in class or industry.`,
-        correctAnswer: "A correct response should connect the topic to a realistic use case.",
-        explanation: "Look for a concrete real-world application rather than a vague definition."
-      }
-    ]
-  };
-}
-
-function applyNotesSignals(stem: TopicBlueprint["stems"][number], keywords: string[]) {
-  if (!keywords.length) return stem;
-  if (stem.type === "Short Answer" || stem.type === "Fill in the Blank") {
-    return {
-      ...stem,
-      text: `${stem.text} Reference these notes terms if useful: ${keywords.slice(0, 3).join(", ")}.`,
-      explanation: `${stem.explanation} Encourage learners to reuse note vocabulary such as ${keywords.slice(0, 2).join(" and ")}.`
-    };
-  }
-
-  return {
-    ...stem,
-    explanation: `${stem.explanation} This wording was nudged toward note keywords like ${keywords.slice(0, 2).join(" and ")}.`
-  };
-}
-
-function pickDifficulty(index: number, requested: AiDifficulty) {
-  if (requested !== "Mixed") return requested;
-  const rotation: Array<"Easy" | "Medium" | "Hard"> = ["Easy", "Medium", "Hard"];
-  return rotation[index % rotation.length];
-}
-
-function pickQuestionType(index: number, requested: AiQuestionType[], fallback: AiQuestionType) {
-  return requested[index % requested.length] ?? fallback;
-}
-
-function buildQuestion(stem: TopicBlueprint["stems"][number], index: number, input: NormalizedInput, source: AiDraftQuestion["source"], keywords: string[]): AiDraftQuestion {
-  const adjusted = input.pastedNotes ? applyNotesSignals(stem, keywords) : stem;
-  const type = pickQuestionType(index, input.questionTypes, adjusted.type);
-  const fallbackAnswer = adjusted.correctAnswer ?? adjusted.options?.[adjusted.correctIndexes?.[0] ?? 0] ?? "Professor-reviewed correct answer";
-  const normalizedOptionTexts = (() => {
-    if (type === "True/False") {
-      return ["True", "False"];
-    }
-
-    if (type === "MCQ Single" || type === "MCQ Multiple") {
-      if (adjusted.options?.length) return adjusted.options;
-      return [
-        fallbackAnswer,
-        "A partially correct distractor",
-        "A common misconception",
-        "An unrelated option"
-      ];
-    }
-
-    return adjusted.options ?? [];
-  })();
-  const options = normalizedOptionTexts.map((text, optionIndex) => ({ id: `opt-${index + 1}-${optionIndex + 1}`, text }));
-  const correctIndexes = (() => {
-    if (type === "True/False") return [0];
-    if (type === "MCQ Multiple") return adjusted.correctIndexes?.length ? adjusted.correctIndexes : [0, 1].filter((value) => value < options.length);
-    if (type === "MCQ Single") return adjusted.correctIndexes?.length ? [adjusted.correctIndexes[0]] : [0];
-    return adjusted.correctIndexes;
-  })();
-  const correctOptionIds = correctIndexes?.map((correctIndex) => options[correctIndex]?.id).filter(Boolean) as string[] | undefined;
-  const difficulty = pickDifficulty(index, input.difficulty);
-  const confidenceBase = input.pastedNotes ? 0.84 : input.topic ? 0.78 : 0.68;
-  const confidence = Math.max(0.42, Math.min(0.97, confidenceBase - (input.pastedNotes && input.pastedNotes.length < 160 ? 0.16 : 0) - (type === "Fill in the Blank" ? 0.04 : 0)));
-
-  const mappedOptions = type === "Short Answer" || type === "Fill in the Blank"
-    ? [{ id: `opt-${index + 1}-1`, text: fallbackAnswer }]
-    : options;
-
-  return {
-    tempId: `draft-${index + 1}-${Math.random().toString(36).slice(2, 7)}`,
-    type,
-    text: adjusted.text,
-    options: mappedOptions,
-    correctOptionIds: type === "MCQ Single" || type === "MCQ Multiple" || type === "True/False" ? correctOptionIds : undefined,
-    correctAnswer: type === "Short Answer" || type === "Fill in the Blank" ? fallbackAnswer : undefined,
-    explanation: adjusted.explanation,
-    difficulty,
-    topicTag: adjusted.topicTag,
-    marks: input.marksPerQuestion,
-    confidence: Number(confidence.toFixed(2)),
-    source,
-    aiGenerated: true
-  };
-}
-
-function ensureStructuredQuestions(output: AiQuizGenerationOutput) {
-  output.questions.forEach((question) => {
-    if (question.type === "MCQ Single" || question.type === "MCQ Multiple" || question.type === "True/False") {
-      if (!question.options.length) throw new Error("Generated MCQ questions must include options.");
-      if (!question.correctOptionIds?.length) throw new Error("Generated MCQ questions must include correct answers.");
-    }
-  });
-  return output;
-}
+export type {
+  AiAgentMode,
+  AiBloomLevel,
+  AiDifficulty,
+  AiDraftQuestion,
+  AiExplanationOutput,
+  AiUploadedMaterialMetadata,
+  AiProviderMetadata,
+  AiQuestionImprovementOutput,
+  ParsedMaterialResult,
+  AiQuestionType,
+  AiQuizGenerationInput,
+  AiQuizGenerationOutput,
+  AiTone
+} from "@/lib/services/ai/types";
 
 async function recordInsight(type: AIInsightType, input: unknown, output: unknown, links: { userId?: string; classroomId?: string } = {}) {
   await prisma.aIInsight.create({
@@ -436,45 +48,292 @@ async function recordInsight(type: AIInsightType, input: unknown, output: unknow
   });
 }
 
-function buildQuizOutput(input: NormalizedInput, type: AIInsightType): AiQuizGenerationOutput {
-  const generationId = createGenerationId();
-  const warnings: string[] = [];
-  const keywords = deriveKeywords(input);
-  const blueprint = detectBlueprint(input);
-  const source: AiDraftQuestion["source"] = input.pastedNotes
-    ? "Based on pasted notes"
-    : input.topic
-      ? "Based on topic prompt"
-      : "General knowledge - review carefully";
+function buildAuditInput(input: AiQuizGenerationInput | ReturnType<typeof sanitizeAiQuizGenerationInput>["normalized"], requestedProvider: AiProviderMetadata["provider"]) {
+  const materialMetadata = input.materialMetadata
+    ? {
+        ...input.materialMetadata,
+        previewText: truncateForAudit(input.materialMetadata.previewText, 240)
+      }
+    : undefined;
 
-  if (input.pastedNotes && input.pastedNotes.length < 160) {
-    warnings.push("Pasted notes are short, so confidence is lower and wording may be more generic.");
+  return {
+    ...input,
+    pastedNotes: truncateForAudit(input.pastedNotes),
+    materialText: truncateForAudit(input.materialText),
+    materialMetadata,
+    requestedProvider
+  };
+}
+
+function logProviderError(operation: string, error: unknown) {
+  const message = error instanceof Error ? error.message : "Unknown AI provider error";
+  console.error(`[quizly-ai] ${operation} failed`, { message });
+}
+
+function normalizeDuplicateText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[`*_~()[\]{}:;'",.!?/-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeDuplicateQuestion(left: string, right: string) {
+  const normalizedLeft = normalizeDuplicateText(left);
+  const normalizedRight = normalizeDuplicateText(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+  if (normalizedLeft.length > 24 && normalizedRight.includes(normalizedLeft)) return true;
+  if (normalizedRight.length > 24 && normalizedLeft.includes(normalizedRight)) return true;
+
+  const leftWords = new Set(normalizedLeft.split(" ").filter((word) => word.length > 3));
+  const rightWords = new Set(normalizedRight.split(" ").filter((word) => word.length > 3));
+  if (leftWords.size < 4 || rightWords.size < 4) return false;
+  const overlap = [...leftWords].filter((word) => rightWords.has(word)).length;
+  return overlap / Math.min(leftWords.size, rightWords.size) >= 0.82;
+}
+
+async function removeQuestionBankDuplicates(
+  validated: ReturnType<typeof validateQuizDraftPayload>,
+  normalized: ReturnType<typeof sanitizeAiQuizGenerationInput>["normalized"]
+) {
+  if (!normalized.avoidQuestionBankDuplicates || !normalized.userId || !validated.questions.length) {
+    return validated;
   }
 
-  if (!input.pastedNotes && !input.topic?.trim()) {
-    warnings.push("Topic context is thin. Review each draft carefully before inserting it.");
+  const bankItems = await prisma.questionBankItem.findMany({
+    where: { professorId: normalized.userId },
+    select: { text: true }
+  });
+  if (!bankItems.length) return validated;
+
+  const filtered = validated.questions.filter((question) =>
+    !bankItems.some((item) => looksLikeDuplicateQuestion(question.text, item.text))
+  );
+  const removedCount = validated.questions.length - filtered.length;
+  if (!removedCount) return validated;
+
+  return {
+    ...validated,
+    questions: filtered.length ? filtered : validated.questions.slice(0, 1),
+    warnings: [
+      ...validated.warnings,
+      filtered.length
+        ? `Removed ${removedCount} near-duplicate question${removedCount === 1 ? "" : "s"} already present in your question bank.`
+        : `Detected ${removedCount} near-duplicate question${removedCount === 1 ? "" : "s"} in your question bank; kept one draft so you can revise it manually.`
+    ]
+  };
+}
+
+async function recordGenerationNotifications(
+  operation: "generateQuizDraft" | "generateRemedialQuiz" | "regenerateQuestion",
+  normalized: ReturnType<typeof sanitizeAiQuizGenerationInput>["normalized"],
+  output: AiQuizGenerationOutput
+) {
+  if (operation === "regenerateQuestion" || !normalized.userId) {
+    return;
   }
 
-  if (input.avoidQuestionBankDuplicates) {
-    warnings.push("Near-duplicate avoidance is mock-only for this phase and still needs professor review.");
-  }
+  const avgConfidence = output.questions.length
+    ? output.questions.reduce((total, question) => total + question.confidence, 0) / output.questions.length
+    : 1;
+  const hasLowConfidence = output.provider.usedFallback || output.warnings.length > 0 || avgConfidence < 0.75;
+  const actionUrl = operation === "generateRemedialQuiz" ? "/professor/analytics" : "/professor/create-quiz";
+  const topicLabel = normalized.topic?.trim() || normalized.materialMetadata?.fileName || "your latest request";
 
-  const questions = Array.from({ length: input.questionCount }).map((_, index) => {
-    const stem = blueprint.stems[index % blueprint.stems.length];
-    return buildQuestion(stem, index, input, source, keywords);
+  try {
+    await createNotification({
+      userId: normalized.userId,
+      role: UserRole.PROFESSOR,
+      context: operation === "generateRemedialQuiz" ? "analytics-remedial" : "quiz-builder",
+      type: NotificationType.AI_QUIZ_GENERATED,
+      title: operation === "generateRemedialQuiz" ? "Remedial quiz ready" : "AI quiz draft ready",
+      message: operation === "generateRemedialQuiz"
+        ? `A remedial quiz for ${topicLabel} is ready to review and assign.`
+        : `Your AI-generated quiz draft for ${topicLabel} is ready in the builder.`,
+      actionUrl
+    });
+
+    await createRoleNotifications(UserRole.ADMIN, {
+      context: operation === "generateRemedialQuiz" ? "analytics-remedial" : "quiz-builder",
+      type: NotificationType.ADMIN_AI_GENERATION_CREATED,
+      title: "New AI generation created",
+      message: `A professor generated ${output.questions.length} AI question${output.questions.length === 1 ? "" : "s"} for ${topicLabel}.`,
+      actionUrl: "/admin/ai-moderation"
+    });
+
+    if (hasLowConfidence) {
+      await createRoleNotifications(UserRole.ADMIN, {
+        context: "ai-moderation",
+        type: NotificationType.ADMIN_LOW_CONFIDENCE_AI_GENERATION,
+        title: "AI generation needs review",
+        message: `The latest ${topicLabel} generation produced warnings or lower-confidence output and should be reviewed.`,
+        actionUrl: "/admin/ai-moderation"
+      });
+    }
+  } catch (error) {
+    console.error("[quizly-notifications] failed to record AI generation notifications", error);
+  }
+}
+
+async function executeQuizOperation(
+  operation: "generateQuizDraft",
+  type: AIInsightType,
+  input: AiQuizGenerationInput & { questionIndex?: number }
+): Promise<AiQuizGenerationOutput>;
+async function executeQuizOperation(
+  operation: "generateRemedialQuiz",
+  type: AIInsightType,
+  input: AiQuizGenerationInput & { questionIndex?: number }
+): Promise<AiQuizGenerationOutput>;
+async function executeQuizOperation(
+  operation: "regenerateQuestion",
+  type: AIInsightType,
+  input: AiQuizGenerationInput & { questionIndex?: number }
+): Promise<AiDraftQuestion>;
+async function executeQuizOperation(
+  operation: "generateQuizDraft" | "generateRemedialQuiz" | "regenerateQuestion",
+  type: AIInsightType,
+  input: AiQuizGenerationInput & { questionIndex?: number }
+) {
+  const { normalized, warnings: inputWarnings } = sanitizeAiQuizGenerationInput(
+    operation === "generateRemedialQuiz"
+      ? {
+          ...input,
+          mode: "analytics-remedial",
+          difficulty: input.difficulty ?? "Easy",
+          questionCount: input.questionCount ?? 5,
+          tone: input.tone ?? "Exam-focused"
+        }
+      : operation === "regenerateQuestion"
+        ? { ...input, questionCount: Math.max(1, (input.questionIndex ?? 0) + 1) }
+        : input
+  );
+
+  const providers = resolveAiProviders();
+  const factoryWarnings = [...providers.factoryWarnings];
+
+  const finalize = (
+    validated: ReturnType<typeof validateQuizDraftPayload>,
+    provider: { provider: AiProviderMetadata["provider"]; model: string; warnings?: string[] },
+    usedFallback: boolean,
+    fallbackWarnings: string[] = []
+  ) => {
+    const providerWarnings = [...factoryWarnings, ...(provider.warnings ?? []), ...inputWarnings, ...fallbackWarnings];
+    const mergedWarnings = [...validated.warnings, ...providerWarnings];
+    const output: AiQuizGenerationOutput = {
+      generationId: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      summary: validated.summary,
+      warnings: mergedWarnings,
+      coverage: validated.coverage,
+      estimatedDifficulty: validated.estimatedDifficulty,
+      suggestedTimeMinutes: validated.suggestedTimeMinutes,
+      questions: validated.questions,
+      provider: {
+        provider: provider.provider,
+        model: provider.model,
+        usedFallback,
+        warnings: providerWarnings
+      }
+    };
+    return output;
+  };
+
+  try {
+    const primaryResult = await providers.provider[operation](input);
+    const questionIndex = operation === "regenerateQuestion" ? input.questionIndex ?? 0 : undefined;
+    const validated = await removeQuestionBankDuplicates(validateQuizDraftPayload(primaryResult.data, normalized), normalized);
+    const output = finalize(validated, primaryResult.provider, false);
+    const result = operation === "regenerateQuestion"
+      ? output.questions[questionIndex ?? 0] ?? output.questions[0]
+      : output;
+
+    await recordInsight(
+      type,
+      buildAuditInput(normalized, providers.requestedProvider),
+      result,
+      { userId: normalized.userId, classroomId: normalized.classId }
+    );
+
+    if (operation !== "regenerateQuestion") {
+      await recordGenerationNotifications(operation, normalized, output);
+    }
+
+    return result;
+  } catch (primaryError) {
+    if (providers.provider === providers.fallback) {
+      throw primaryError;
+    }
+
+    logProviderError(operation, primaryError);
+    const fallbackResult = await providers.fallback[operation](input);
+    const questionIndex = operation === "regenerateQuestion" ? input.questionIndex ?? 0 : undefined;
+    const validated = await removeQuestionBankDuplicates(validateQuizDraftPayload(fallbackResult.data, normalized), normalized);
+    const output = finalize(
+      validated,
+      fallbackResult.provider,
+      true,
+      ["The configured AI provider was unavailable or returned invalid output. Mock fallback was used safely."]
+    );
+    const result = operation === "regenerateQuestion"
+      ? output.questions[questionIndex ?? 0] ?? output.questions[0]
+      : output;
+
+    await recordInsight(
+      type,
+      buildAuditInput(normalized, providers.requestedProvider),
+      result,
+      { userId: normalized.userId, classroomId: normalized.classId }
+    );
+
+    if (operation !== "regenerateQuestion") {
+      await recordGenerationNotifications(operation, normalized, output);
+    }
+
+    return result;
+  }
+}
+
+async function executeSimpleOperation<TValidated extends object & { warnings: string[] }>(
+  operation: "generateExplanation" | "improveQuestion",
+  type: AIInsightType,
+  input: { question?: string; answer?: string; text?: string; tone?: AiTone; userId?: string },
+  validate: (payload: any) => TValidated,
+) {
+  const providers = resolveAiProviders();
+  const finalize = (
+    validated: TValidated,
+    provider: { provider: AiProviderMetadata["provider"]; model: string; warnings?: string[] },
+    usedFallback: boolean,
+    fallbackWarnings: string[] = []
+  ) => ({
+    ...validated,
+    warnings: [...validated.warnings, ...providers.factoryWarnings, ...(provider.warnings ?? []), ...fallbackWarnings],
+    provider: {
+      provider: provider.provider,
+      model: provider.model,
+      usedFallback,
+      warnings: [...providers.factoryWarnings, ...(provider.warnings ?? []), ...fallbackWarnings]
+    } satisfies AiProviderMetadata
   });
 
-  return ensureStructuredQuestions({
-    generationId,
-    summary: type === AIInsightType.REMEDIAL_GENERATION
-      ? `Drafted a lighter remedial set around ${input.topic ?? "the weak topic"} with professor review required.`
-      : `Drafted ${questions.length} AI questions for ${input.topic ?? input.subject ?? "your topic"} with explanations and review guardrails.`,
-    warnings,
-    coverage: blueprint.coverage,
-    estimatedDifficulty: input.difficulty,
-    suggestedTimeMinutes: Math.max(5, questions.length * (input.mode === "analytics-remedial" ? 1 : 2)),
-    questions
-  });
+  try {
+    const primaryResult = await providers.provider[operation](input as never);
+    const validated = validate(primaryResult.data);
+    const output = finalize(validated, primaryResult.provider, false);
+    await recordInsight(type, input, output, { userId: input.userId });
+    return output;
+  } catch (primaryError) {
+    if (providers.provider === providers.fallback) {
+      throw primaryError;
+    }
+    logProviderError(operation, primaryError);
+    const fallbackResult = await providers.fallback[operation](input as never);
+    const validated = validate(fallbackResult.data);
+    const output = finalize(validated, fallbackResult.provider, true, ["The configured AI provider was unavailable or returned invalid output. Mock fallback was used safely."]);
+    await recordInsight(type, input, output, { userId: input.userId });
+    return output;
+  }
 }
 
 export function mapAiDraftToQuizQuestion(question: AiDraftQuestion): QuizQuestion {
@@ -522,39 +381,15 @@ export function mapAiDraftToQuestionBankItem(question: AiDraftQuestion, context:
 }
 
 export async function generateQuizDraft(input: AiQuizGenerationInput) {
-  const normalized = sanitizeInput(input);
-  const output = buildQuizOutput(normalized, AIInsightType.QUIZ_GENERATION);
-  await recordInsight(
-    AIInsightType.QUIZ_GENERATION,
-    { ...normalized, pastedNotes: truncateForAudit(normalized.pastedNotes) },
-    output,
-    { userId: normalized.userId, classroomId: normalized.classId }
-  );
-  return output;
+  return executeQuizOperation("generateQuizDraft", AIInsightType.QUIZ_GENERATION, input);
 }
 
 export async function generateRemedialQuiz(input: AiQuizGenerationInput) {
-  const normalized = sanitizeInput({ ...input, mode: "analytics-remedial", difficulty: input.difficulty ?? "Easy", questionCount: input.questionCount ?? 5, tone: input.tone ?? "Exam-focused" });
-  const output = buildQuizOutput(normalized, AIInsightType.REMEDIAL_GENERATION);
-  await recordInsight(
-    AIInsightType.REMEDIAL_GENERATION,
-    { ...normalized, pastedNotes: truncateForAudit(normalized.pastedNotes) },
-    output,
-    { userId: normalized.userId, classroomId: normalized.classId }
-  );
-  return output;
+  return executeQuizOperation("generateRemedialQuiz", AIInsightType.REMEDIAL_GENERATION, input);
 }
 
 export async function regenerateQuestion(input: AiQuizGenerationInput & { questionIndex?: number }) {
-  const draft = await generateQuizDraft({ ...input, questionCount: Math.max(1, (input.questionIndex ?? 0) + 1) });
-  const question = draft.questions[input.questionIndex ?? 0] ?? draft.questions[0];
-  await recordInsight(
-    AIInsightType.QUESTION_REGENERATION,
-    { ...input, pastedNotes: truncateForAudit(input.pastedNotes) },
-    question,
-    { userId: input.userId, classroomId: input.classId }
-  );
-  return question;
+  return executeQuizOperation("regenerateQuestion", AIInsightType.QUESTION_REGENERATION, input);
 }
 
 export async function improveQuestion(input: { text?: string; tone?: AiTone; userId?: string }) {
@@ -562,14 +397,12 @@ export async function improveQuestion(input: { text?: string; tone?: AiTone; use
     throw new Error("Question text is required for improvement.");
   }
 
-  const tone = input.tone ?? "Conceptual";
-  const output = {
-    text: `${input.text.trim().replace(/\?*$/, "")}? (${tone.toLowerCase()} wording, tightened for clarity)`,
-    rationale: `Clarified wording for a ${tone.toLowerCase()} classroom review flow while keeping the same learning objective.`
-  };
-
-  await recordInsight(AIInsightType.QUESTION_IMPROVEMENT, input, output, { userId: input.userId });
-  return output;
+  return executeSimpleOperation<Omit<AiQuestionImprovementOutput, "provider">>(
+    "improveQuestion",
+    AIInsightType.QUESTION_IMPROVEMENT,
+    input,
+    (payload) => validateQuestionImprovementPayload(payload, input.text!.trim())
+  );
 }
 
 export async function generateExplanation(input: { question?: string; answer?: string; userId?: string }) {
@@ -577,12 +410,10 @@ export async function generateExplanation(input: { question?: string; answer?: s
     throw new Error("Question text is required to generate an explanation.");
   }
 
-  const output = {
-    explanation: input.answer?.trim()
-      ? `The best answer is ${input.answer.trim()} because it directly matches the concept being tested in the question. Review the key definition and one example before publishing.`
-      : "The explanation should connect the correct answer back to the core concept, then give one brief reason the distractors are less suitable."
-  };
-
-  await recordInsight(AIInsightType.QUESTION_IMPROVEMENT, input, output, { userId: input.userId });
-  return output;
+  return executeSimpleOperation<Omit<AiExplanationOutput, "provider">>(
+    "generateExplanation",
+    AIInsightType.QUESTION_IMPROVEMENT,
+    input,
+    validateExplanationPayload
+  );
 }

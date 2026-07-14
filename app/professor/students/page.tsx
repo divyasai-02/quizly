@@ -11,6 +11,11 @@ export default function ProfessorStudentsPage() {
   const [classFilter, setClassFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState("All");
   const [selected, setSelected] = useState<any | null>(null);
+  const [messageTarget, setMessageTarget] = useState<any | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const [attentionFlags, setAttentionFlags] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -33,6 +38,38 @@ export default function ProfessorStudentsPage() {
 
   function toggleAttention(studentId: string) {
     setAttentionFlags((current) => ({ ...current, [studentId]: !current[studentId] }));
+  }
+
+  function openMessage(student: any) {
+    setMessageTarget(student);
+    setMessageText(`Hi ${student.studentName.split(" ")[0]}, I reviewed your recent quiz progress. Please revisit ${student.weakTopics[0] ?? "the latest practice topic"} and message me if you need help.`);
+    setNotice(null);
+    setError(null);
+  }
+
+  async function sendMessage() {
+    if (!messageTarget) return;
+    setSending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/professor/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: messageTarget.studentId, message: messageText })
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "Message failed.");
+      }
+      setNotice(`Message sent to ${messageTarget.studentName}.`);
+      setMessageTarget(null);
+      setMessageText("");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Message failed.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -61,6 +98,9 @@ export default function ProfessorStudentsPage() {
           </div>
         </div>
 
+        {error ? <div className="notice">{error}</div> : null}
+        {notice ? <div className="notice success">{notice}</div> : null}
+
         {!data ? (
           <div className="grid grid-3">{Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index} lines={5} />)}</div>
         ) : !rows.length ? (
@@ -85,7 +125,7 @@ export default function ProfessorStudentsPage() {
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
                     <button className="btn primary" onClick={() => setSelected(student)} type="button"><UserRoundSearch size={16} />Open Profile</button>
                     <button className="btn" onClick={() => toggleAttention(student.studentId)} type="button"><AlertTriangle size={16} />{attentionFlags[student.studentId] ? "Clear Flag" : "Flag Attention"}</button>
-                    <button className="btn" disabled type="button"><MessageSquare size={16} />Message Soon</button>
+                    <button className="btn" onClick={() => openMessage(student)} type="button"><MessageSquare size={16} />Message</button>
                   </div>
                 </section>
               ))}
@@ -122,7 +162,7 @@ export default function ProfessorStudentsPage() {
                         <div className="table-actions">
                           <button className="linkish" onClick={() => setSelected(student)} type="button">View</button>
                           <button className="linkish" onClick={() => toggleAttention(student.studentId)} type="button">{attentionFlags[student.studentId] ? "Unflag" : "Flag"}</button>
-                          <button className="linkish" disabled type="button">Message</button>
+                          <button className="linkish" onClick={() => openMessage(student)} type="button">Message</button>
                         </div>
                       </td>
                     </tr>
@@ -187,7 +227,30 @@ export default function ProfessorStudentsPage() {
               </section>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button className="btn primary" onClick={() => toggleAttention(selected.studentId)} type="button">{attentionFlags[selected.studentId] ? "Clear Needs Attention" : "Flag Needs Attention"}</button>
-                <button className="btn" disabled type="button">Message Student - Coming Soon</button>
+                <button className="btn" onClick={() => openMessage(selected)} type="button">Message Student</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {messageTarget ? (
+          <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="student-message-title">
+            <div className="modal-card pad grid">
+              <div className="section-head">
+                <div>
+                  <h2 id="student-message-title">Message {messageTarget.studentName}</h2>
+                  <p className="muted small">Sends an in-app notification to the student.</p>
+                </div>
+                <button className="btn" onClick={() => setMessageTarget(null)} disabled={sending} type="button">Close</button>
+              </div>
+              <label>
+                <strong>Message</strong>
+                <textarea className="textarea" value={messageText} onChange={(event) => setMessageText(event.target.value)} maxLength={500} />
+              </label>
+              <p className="muted small">{messageText.length}/500 characters</p>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <button className="btn" onClick={() => setMessageTarget(null)} disabled={sending} type="button">Cancel</button>
+                <button className="btn primary" onClick={sendMessage} disabled={sending || !messageText.trim()} type="button">{sending ? "Sending..." : "Send Message"}</button>
               </div>
             </div>
           </div>

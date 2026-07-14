@@ -5,7 +5,7 @@ import { summarizeAttemptLearning } from "@/lib/services/studentLearningService"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireStudent(request);
+    const user = await requireStudent(request);
     const attempt = await prisma.quizAttempt.findUniqueOrThrow({
       where: { id: params.id },
       include: {
@@ -26,7 +26,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
         }
       }
     });
-    if (attempt.studentId !== user.id) throw new Error("You can only review your own attempts.");
+
+    if (attempt.studentId !== user.id) {
+      throw new Error("You can only review your own attempts.");
+    }
 
     const classmates = await prisma.quizAttempt.findMany({
       where: { quizId: attempt.quizId, status: { in: ["SUBMITTED", "AUTO_SUBMITTED"] } },

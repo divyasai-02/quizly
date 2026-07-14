@@ -5,7 +5,7 @@ import { regenerateQuestion, type AiQuizGenerationInput } from "@/lib/services/a
 export async function POST(request: Request) {
   try {
     const body = await readJson<AiQuizGenerationInput & { questionIndex?: number }>(request);
-    return json(await regenerateQuestion({ ...body, mode: body.mode ?? "quiz-builder", userId: requireProfessor(request).id }));
+    return json(await regenerateQuestion({ ...body, mode: body.mode ?? "quiz-builder", userId: (await requireProfessor(request)).id }));
   } catch (error) {
     return errorResponse(error);
   }

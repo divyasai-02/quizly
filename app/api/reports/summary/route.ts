@@ -17,7 +17,7 @@ function getFilters(request: Request): ReportFilters {
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const dataset = await loadReportingDataset(prisma, { professorId: user.id });
     return json(buildProfessorReportsView(dataset, getFilters(request)));
   } catch (error) {

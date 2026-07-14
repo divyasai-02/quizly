@@ -137,6 +137,36 @@ export default function AdminDashboardPage() {
                 </div>
               </section>
             </div>
+
+            <section className="card pad">
+              <div className="section-head">
+                <div>
+                  <h2>Admin Audit Trail</h2>
+                  <p className="muted small">Recent privileged actions recorded for accountability.</p>
+                </div>
+                <Badge tone="purple">{(data.auditTrail ?? []).length} events</Badge>
+              </div>
+              {(data.auditTrail ?? []).length ? (
+                <table className="table">
+                  <thead>
+                    <tr><th>Time</th><th>Admin</th><th>Action</th><th>Entity</th><th>Details</th></tr>
+                  </thead>
+                  <tbody>
+                    {data.auditTrail.map((event: any) => (
+                      <tr key={event.id}>
+                        <td>{event.createdLabel}</td>
+                        <td><strong>{event.actor}</strong></td>
+                        <td>{event.action.replaceAll("_", " ").replaceAll(".", " / ")}</td>
+                        <td>{event.entity}{event.entityId ? `: ${event.entityId}` : ""}</td>
+                        <td className="muted small">{event.metadata ? JSON.stringify(event.metadata) : "No extra details"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState title="No admin actions recorded yet" text="User, classroom, subject, settings, and moderation changes will appear here." />
+              )}
+            </section>
           </>
         )}
       </div>

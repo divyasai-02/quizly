@@ -5,7 +5,7 @@ import { buildAdminSubjectsView, loadReportingDataset } from "@/lib/services/rep
 
 export async function GET(request: Request) {
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
     const dataset = await loadReportingDataset(prisma);
     return json({ subjects: buildAdminSubjectsView(dataset) });
   } catch (error) {

@@ -1,7 +1,8 @@
-import "server-only";
-
 import { cookies } from "next/headers";
-import { DEMO_ROLE_COOKIE, DEMO_SESSION_COOKIE, DemoRoleKey, DemoUserSession, resolveDemoUser } from "@/lib/demoSession";
+import { DemoRoleKey } from "@/lib/demoSession";
+import { findUserById } from "@/lib/auth/service";
+import { AUTH_COOKIE, readSessionToken } from "@/lib/auth/session";
+import type { AppSessionUser } from "@/lib/auth/types";
 
 type RequestWithCookies = Request & {
   cookies?: {
@@ -17,20 +18,22 @@ function getCookieValue(request: RequestWithCookies | undefined, name: string) {
   return cookies().get(name)?.value;
 }
 
-export function getServerUser(request?: RequestWithCookies) {
-  return resolveDemoUser(getCookieValue(request, DEMO_SESSION_COOKIE), getCookieValue(request, DEMO_ROLE_COOKIE));
+export async function getServerUser(request?: RequestWithCookies) {
+  const session = await readSessionToken(getCookieValue(request, AUTH_COOKIE));
+  if (!session) return null;
+  return findUserById(session.userId);
 }
 
-export function requireServerUser(request?: RequestWithCookies) {
-  const user = getServerUser(request);
+export async function requireServerUser(request?: RequestWithCookies) {
+  const user = await getServerUser(request);
   if (!user) {
-    throw new Response(JSON.stringify({ error: "No active demo session. Choose a role to continue." }), { status: 401 });
+    throw new Response(JSON.stringify({ error: "Please log in to continue." }), { status: 401 });
   }
   return user;
 }
 
-export function requireServerRole(allowedRoles: DemoRoleKey[], request?: RequestWithCookies) {
-  const user = requireServerUser(request);
+export async function requireServerRole(allowedRoles: DemoRoleKey[], request?: RequestWithCookies) {
+  const user = await requireServerUser(request);
   if (!allowedRoles.includes(user.roleKey)) {
     throw new Response(
       JSON.stringify({
@@ -43,18 +46,18 @@ export function requireServerRole(allowedRoles: DemoRoleKey[], request?: Request
   return user;
 }
 
-export function requireProfessor(request?: RequestWithCookies) {
+export async function requireProfessor(request?: RequestWithCookies) {
   return requireServerRole(["professor"], request);
 }
 
-export function requireStudent(request?: RequestWithCookies) {
+export async function requireStudent(request?: RequestWithCookies) {
   return requireServerRole(["student"], request);
 }
 
-export function requireAdmin(request?: RequestWithCookies) {
+export async function requireAdmin(request?: RequestWithCookies) {
   return requireServerRole(["admin"], request);
 }
 
-export function canTakeQuiz(user: DemoUserSession | null) {
+export function canTakeQuiz(user: AppSessionUser | null) {
   return user?.role === "STUDENT";
 }

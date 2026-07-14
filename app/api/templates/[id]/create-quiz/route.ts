@@ -6,7 +6,7 @@ import { buildTemplateQuizData, getTemplateById } from "@/lib/templates";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const template = getTemplateById(params.id);
     if (!template) throw new Error("Template not found.");
 

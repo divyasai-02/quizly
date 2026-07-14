@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Expand, ListChecks, PlayCircle, Star, Trophy } from "lucide-react";
 import { SkeletonBlock, SkeletonCard } from "@/components/ui";
-import { clearSession, getCurrentRole } from "@/lib/demoSession";
 import { quizApi } from "@/lib/apiClient";
 
 export default function InstructionsPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
   const [quiz, setQuiz] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    setRole(getCurrentRole());
+    fetch("/api/session/current", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => setRole(payload.user?.roleKey ?? null))
+      .catch(() => setRole(null));
+
     quizApi.instructions(params.id)
       .then((data) => setQuiz({
         title: data.title,
@@ -73,7 +74,7 @@ export default function InstructionsPage({ params }: { params: { id: string } })
           ) : (
             <div className="grid">
               <div className="notice">Quiz taking is student-first in this demo. Switch to the Student role to complete the full attempt flow.</div>
-              <button className="btn full" onClick={() => { clearSession(); router.push("/"); router.refresh(); }} type="button">Switch Demo Role</button>
+              <Link className="btn full" href="/demo/logout">Switch Demo Role</Link>
             </div>
           )}
         </div>}

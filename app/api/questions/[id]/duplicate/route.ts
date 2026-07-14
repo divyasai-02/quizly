@@ -4,7 +4,7 @@ import { requireProfessor } from "@/lib/serverSession";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const source = await prisma.question.findUniqueOrThrow({
       where: { id: params.id },
       include: { options: true, quiz: { include: { questions: true } } }

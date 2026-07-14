@@ -1,4 +1,5 @@
-import { PrismaClient, QuestionType, QuizStatus, UserRole, AttemptStatus, AIInsightType } from "@prisma/client";
+import { PrismaClient, QuestionType, QuizStatus, UserRole, AttemptStatus, AIInsightType, NotificationType } from "@prisma/client";
+import { hashPassword } from "@/lib/auth/password";
 
 const prisma = new PrismaClient();
 
@@ -115,25 +116,30 @@ const quizFixtures: Array<{
 ];
 
 async function main() {
-  await prisma.attemptSelectedOption.deleteMany();
-  await prisma.attemptAnswer.deleteMany();
-  await prisma.quizAttempt.deleteMany();
-  await prisma.aIInsight.deleteMany();
-  await prisma.questionBankItem.deleteMany();
-  await prisma.questionOption.deleteMany();
-  await prisma.question.deleteMany();
-  await prisma.quiz.deleteMany();
-  await prisma.classroomStudent.deleteMany();
-  await prisma.classroom.deleteMany();
-  await prisma.user.deleteMany();
+  const demoPasswordHash = await hashPassword("password123");
+
+  await prisma.$transaction([
+    prisma.notification.deleteMany(),
+    prisma.attemptSelectedOption.deleteMany(),
+    prisma.attemptAnswer.deleteMany(),
+    prisma.quizAttempt.deleteMany(),
+    prisma.aIInsight.deleteMany(),
+    prisma.questionBankItem.deleteMany(),
+    prisma.questionOption.deleteMany(),
+    prisma.question.deleteMany(),
+    prisma.quiz.deleteMany(),
+    prisma.classroomStudent.deleteMany(),
+    prisma.classroom.deleteMany(),
+    prisma.user.deleteMany()
+  ]);
 
   await prisma.user.createMany({
     data: [
-      { id: professorId, name: "Prof. John Doe", email: "johndoe@university.edu", passwordHash: "demo-auth-placeholder", role: UserRole.PROFESSOR },
-      { id: "student-arjun", name: "Arjun Mehta", email: "arjun@student.edu", passwordHash: "demo-auth-placeholder", role: UserRole.STUDENT },
-      { id: "student-diya", name: "Diya Sharma", email: "diya@student.edu", passwordHash: "demo-auth-placeholder", role: UserRole.STUDENT },
-      { id: "student-rohit", name: "Rohit Verma", email: "rohit@student.edu", passwordHash: "demo-auth-placeholder", role: UserRole.STUDENT },
-      { id: "admin-demo", name: "Admin", email: "admin@quizly.test", passwordHash: "demo-auth-placeholder", role: UserRole.ADMIN }
+      { id: professorId, name: "Prof. John Doe", email: "professor@quizly.local", passwordHash: demoPasswordHash, role: UserRole.PROFESSOR },
+      { id: "student-arjun", name: "Arjun Mehta", email: "student@quizly.local", passwordHash: demoPasswordHash, role: UserRole.STUDENT },
+      { id: "student-diya", name: "Diya Sharma", email: "diya@quizly.local", passwordHash: demoPasswordHash, role: UserRole.STUDENT },
+      { id: "student-rohit", name: "Rohit Verma", email: "rohit@quizly.local", passwordHash: demoPasswordHash, role: UserRole.STUDENT },
+      { id: "admin-demo", name: "Admin", email: "admin@quizly.local", passwordHash: demoPasswordHash, role: UserRole.ADMIN }
     ]
   });
 
@@ -343,6 +349,145 @@ async function main() {
         type: AIInsightType.QUESTION_IMPROVEMENT,
         inputJson: JSON.stringify({ text: "Explain normalization.", tone: "Conceptual" }),
         outputJson: JSON.stringify({ text: "Explain how normalization reduces redundancy and anomalies.", rationale: "Clarified the learning objective.", confidence: 88 })
+      }
+    ]
+  });
+
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: professorId,
+        role: UserRole.PROFESSOR,
+        context: "quiz-builder",
+        type: NotificationType.AI_QUIZ_GENERATED,
+        title: "AI quiz draft ready",
+        message: "A new operating systems quiz draft is ready in the builder for final review.",
+        actionUrl: "/professor/create-quiz",
+        createdAt: new Date(Date.now() - 1000 * 60 * 18)
+      },
+      {
+        userId: professorId,
+        role: UserRole.PROFESSOR,
+        context: "risk",
+        type: NotificationType.STUDENT_PERFORMANCE_RISK,
+        title: "Performance risk detected",
+        message: "Rohit Verma is trending below the pass threshold in JavaScript basics and needs intervention.",
+        actionUrl: "/professor/students",
+        createdAt: new Date(Date.now() - 1000 * 60 * 40)
+      },
+      {
+        userId: professorId,
+        role: UserRole.PROFESSOR,
+        context: "attempt",
+        type: NotificationType.QUIZ_COMPLETED,
+        title: "Student quiz completed",
+        message: "Arjun Mehta completed DBMS Fundamentals and scored above the class average.",
+        actionUrl: "/professor/quizzes",
+        read: true,
+        createdAt: new Date(Date.now() - 1000 * 60 * 95)
+      },
+      {
+        userId: professorId,
+        role: UserRole.PROFESSOR,
+        context: "reports",
+        type: NotificationType.REPORT_GENERATED,
+        title: "Student progress report exported",
+        message: "The latest student progress CSV is ready to present in your review meeting.",
+        actionUrl: "/professor/reports",
+        read: true,
+        createdAt: new Date(Date.now() - 1000 * 60 * 180)
+      },
+      {
+        userId: "student-arjun",
+        role: UserRole.STUDENT,
+        context: "assignment",
+        type: NotificationType.NEW_QUIZ_ASSIGNED,
+        title: "New quiz assigned",
+        message: "Operating Systems Quiz is now open for your CSE - A classroom.",
+        actionUrl: "/quiz/operating-systems/instructions",
+        createdAt: new Date(Date.now() - 1000 * 60 * 15)
+      },
+      {
+        userId: "student-arjun",
+        role: UserRole.STUDENT,
+        context: "results",
+        type: NotificationType.RESULT_AVAILABLE,
+        title: "Quiz result available",
+        message: "Your JavaScript Basics result is ready to review with feedback and weak topics.",
+        actionUrl: "/student/dashboard",
+        createdAt: new Date(Date.now() - 1000 * 60 * 52)
+      },
+      {
+        userId: "student-diya",
+        role: UserRole.STUDENT,
+        context: "practice",
+        type: NotificationType.WEAK_TOPIC_PRACTICE_RECOMMENDED,
+        title: "Practice recommended",
+        message: "Normalization is showing up as a weak topic. Run a short targeted practice set today.",
+        actionUrl: "/student/practice?topic=Normalization",
+        createdAt: new Date(Date.now() - 1000 * 60 * 28)
+      },
+      {
+        userId: "student-arjun",
+        role: UserRole.STUDENT,
+        context: "achievements",
+        type: NotificationType.BADGE_UNLOCKED,
+        title: "New badge unlocked",
+        message: "You earned the Consistent Climber badge after back-to-back strong attempts.",
+        actionUrl: "/student/achievements",
+        read: true,
+        createdAt: new Date(Date.now() - 1000 * 60 * 135)
+      },
+      {
+        userId: "student-arjun",
+        role: UserRole.STUDENT,
+        context: "leaderboard",
+        type: NotificationType.LEADERBOARD_RANK_UPDATED,
+        title: "Leaderboard rank updated",
+        message: "You moved up to #2 on the seeded classroom leaderboard.",
+        actionUrl: "/student/leaderboards",
+        createdAt: new Date(Date.now() - 1000 * 60 * 75)
+      },
+      {
+        userId: "admin-demo",
+        role: UserRole.ADMIN,
+        context: "ai-moderation",
+        type: NotificationType.ADMIN_AI_GENERATION_CREATED,
+        title: "New AI generation created",
+        message: "A professor generated a new scheduling quiz draft that is ready for moderation visibility.",
+        actionUrl: "/admin/ai-moderation",
+        createdAt: new Date(Date.now() - 1000 * 60 * 22)
+      },
+      {
+        userId: "admin-demo",
+        role: UserRole.ADMIN,
+        context: "users",
+        type: NotificationType.ADMIN_NEW_USER_REGISTERED,
+        title: "New user registered",
+        message: "A new student account was added to the demo environment this morning.",
+        actionUrl: "/admin/users",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60)
+      },
+      {
+        userId: "admin-demo",
+        role: UserRole.ADMIN,
+        context: "ai-moderation",
+        type: NotificationType.ADMIN_LOW_CONFIDENCE_AI_GENERATION,
+        title: "AI generation needs review",
+        message: "One remedial generation included warnings and should be reviewed before broad rollout.",
+        actionUrl: "/admin/ai-moderation",
+        createdAt: new Date(Date.now() - 1000 * 60 * 110)
+      },
+      {
+        userId: "admin-demo",
+        role: UserRole.ADMIN,
+        context: "platform-summary",
+        type: NotificationType.ADMIN_PLATFORM_ACTIVITY_SUMMARY,
+        title: "Platform activity summary",
+        message: "Today: 3 active quizzes, 9 completed attempts, and 2 AI events requiring admin awareness.",
+        actionUrl: "/admin/dashboard",
+        read: true,
+        createdAt: new Date(Date.now() - 1000 * 60 * 200)
       }
     ]
   });

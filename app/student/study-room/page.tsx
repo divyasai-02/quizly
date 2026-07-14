@@ -10,10 +10,27 @@ import { studentApi } from "@/lib/apiClient";
 export default function StudyRoomPage() {
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     studentApi.studyRoom().then(setData).catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Study room failed to load."));
   }, []);
+
+  const suggestedTopic = data?.weakTopicCards?.[0]?.topic ?? "JavaScript Basics";
+  const flashcards = [
+    ...(data?.missedQuestions ?? []).map((question: any) => ({
+      id: question.id,
+      front: question.text,
+      back: question.explanation || `Review ${question.topic}, then retry a short practice loop.`,
+      topic: question.topic
+    })),
+    ...(data?.weakTopicCards ?? []).map((topic: any) => ({
+      id: `topic-${topic.topic}`,
+      front: `What should you revise in ${topic.topic}?`,
+      back: `${topic.recommendedQuestionCount} ${topic.difficulty.toLowerCase()} practice questions are recommended for ${topic.subject}.`,
+      topic: topic.topic
+    }))
+  ].slice(0, 6);
 
   return (
     <AppShell title="Study Room" subtitle="Practice smarter with revision prompts, weak-topic focus, and spaced review.">
@@ -31,7 +48,7 @@ export default function StudyRoomPage() {
                   <p className="muted">{data.aiSuggestion}</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn primary" href={`/student/practice?topic=${encodeURIComponent(data.weakTopicCards?.[0]?.topic ?? "General")}`}>Start Practice</Link>
+                  <Link className="btn primary" href={`/student/practice?topic=${encodeURIComponent(suggestedTopic)}`}>Start Practice</Link>
                   {data.latestAttemptId ? <Link className="btn" href={`/attempts/${data.latestAttemptId}/review`}>Review missed answers</Link> : null}
                 </div>
               </div>
@@ -58,7 +75,7 @@ export default function StudyRoomPage() {
                       <h3>{topic.topic}</h3>
                       <p className="muted">{topic.subject}</p>
                       <p className="small">Weak score: <strong>{topic.weakScore}%</strong></p>
-                      <p className="small">{topic.recommendedQuestionCount} recommended questions · {topic.difficulty}</p>
+                      <p className="small">{topic.recommendedQuestionCount} recommended questions - {topic.difficulty}</p>
                       <Link className="btn primary full" href={`/student/practice?topic=${encodeURIComponent(topic.topic)}`}>Start Practice</Link>
                     </div>
                   ))}
@@ -77,7 +94,7 @@ export default function StudyRoomPage() {
                 {data.missedQuestions?.length ? data.missedQuestions.map((question: any) => (
                   <div className="soft-panel pad-sm" key={question.id} style={{ marginBottom: 12 }}>
                     <strong>{question.text}</strong>
-                    <p className="muted small">{question.topic} · {question.status}</p>
+                    <p className="muted small">{question.topic} - {question.status}</p>
                     <Link className="linkish" href={`/student/practice?topic=${encodeURIComponent(question.topic)}`}>Review</Link>
                   </div>
                 )) : <EmptyState title="Nothing missed recently" text="Great work. Your missed-question review list will appear after a submitted quiz." />}
@@ -85,12 +102,34 @@ export default function StudyRoomPage() {
 
               <section className="card pad">
                 <h3>Flashcards / Spaced Revision</h3>
-                <div className="soft-panel pad-sm" style={{ minHeight: 140 }}>
-                  <Clock3 size={22} />
-                  <p className="muted">Spaced repetition flashcards are coming soon. This polished placeholder keeps the study room complete without exposing broken flows.</p>
-                </div>
+                {flashcards.length ? (
+                  <div className="grid">
+                    {flashcards.map((card: any) => {
+                      const flipped = !!flippedCards[card.id];
+                      return (
+                        <button
+                          className="soft-panel pad-sm"
+                          key={card.id}
+                          onClick={() => setFlippedCards((current) => ({ ...current, [card.id]: !current[card.id] }))}
+                          style={{ minHeight: 120, textAlign: "left", cursor: "pointer" }}
+                          type="button"
+                        >
+                          <Clock3 size={22} />
+                          <p className="muted small">{card.topic}</p>
+                          <strong>{flipped ? card.back : card.front}</strong>
+                          <p className="muted small">{flipped ? "Click to show prompt" : "Click to reveal revision note"}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="soft-panel pad-sm" style={{ minHeight: 140 }}>
+                    <Clock3 size={22} />
+                    <p className="muted">Complete a quiz to generate spaced revision flashcards from missed questions and weak topics.</p>
+                  </div>
+                )}
                 <div style={{ marginTop: 18 }}>
-                  <button className="btn full" disabled type="button">Generate Practice Quiz - Coming soon</button>
+                  <Link className="btn primary full" href={`/student/practice?topic=${encodeURIComponent(suggestedTopic)}`}>Generate Practice Quiz</Link>
                 </div>
               </section>
             </div>

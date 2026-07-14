@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3, BookOpen, CheckCircle2, ChevronRight, ClipboardList, FileQuestion, GraduationCap, Library, Lock, MoreVertical, PlayCircle, Plus, Sparkles, Upload, Wand2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -21,6 +21,9 @@ type DashboardSummary = {
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [quizSearch, setQuizSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   useEffect(() => {
     dashboardApi.summary()
@@ -40,6 +43,17 @@ export default function DashboardPage() {
   const classSummary = summary
     ? `${summary.classes.length} classes, ${liveQuizzes.length} live quizzes, ${summary.stats.find((item) => item.label === "Drafts")?.value ?? "0"} drafts`
     : "";
+  const classOptions = useMemo(() => ["All", ...new Set((summary?.quizzes ?? []).map((quiz) => quiz.className).filter(Boolean))], [summary]);
+  const statusOptions = useMemo(() => ["All", ...new Set((summary?.quizzes ?? []).map((quiz) => quizStatusLabel(quiz.status)))], [summary]);
+  const filteredQuizzes = useMemo(() => {
+    return (summary?.quizzes ?? []).filter((quiz) => {
+      const query = quizSearch.trim().toLowerCase();
+      if (query && ![quiz.name, quiz.className, quiz.topic, quiz.subject].some((value) => String(value).toLowerCase().includes(query))) return false;
+      if (classFilter !== "All" && quiz.className !== classFilter) return false;
+      if (statusFilter !== "All" && quizStatusLabel(quiz.status) !== statusFilter) return false;
+      return true;
+    });
+  }, [classFilter, quizSearch, statusFilter, summary]);
 
   return (
     <AppShell title="Dashboard" subtitle="Here's what's happening with your quizzes today.">
@@ -76,7 +90,12 @@ export default function DashboardPage() {
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <Link className="btn primary" href="/professor/create-quiz?ai=open"><Sparkles size={17} />Generate Quiz with AI</Link>
                   <Link className="btn" href="/professor/analytics"><ClipboardList size={17} />Review Weak Topics</Link>
-                  <button className="btn ghost" disabled title="Coming soon">Create Revision Plan</button>
+                  <Link
+                    className="btn ghost"
+                    href={`/professor/create-quiz?ai=open&mode=analytics-remedial&topic=${encodeURIComponent(weakestTopic === "No weak topic yet" ? "Core concepts" : weakestTopic)}&difficulty=Easy&questionCount=5&tone=Exam-focused`}
+                  >
+                    Create Revision Plan
+                  </Link>
                 </div>
               </div>
               <div className="insight-list">
@@ -117,10 +136,10 @@ export default function DashboardPage() {
                 <ChevronRight size={18} className="muted" />
               </div>
             ))}
-            <button className="btn full" style={{ marginTop: 14 }} disabled title="Coming soon">
+            <Link className="btn full" style={{ marginTop: 14 }} href="/professor/classes">
               <Plus size={16} />
-              Add New Class - Coming soon
-            </button>
+              Add New Class
+            </Link>
           </section>
 
           <section className="card pad">
@@ -160,9 +179,13 @@ export default function DashboardPage() {
             <div className="section-head" style={{ padding: "18px 20px 0" }}>
               <h3>Recent Quizzes</h3>
               <div style={{ display: "flex", gap: 10 }}>
-                <input className="input" placeholder="Search coming soon" disabled />
-                <select className="select" disabled><option>All Classes</option></select>
-                <select className="select" disabled><option>All Status</option></select>
+                <input className="input" placeholder="Search quizzes, class, topic" value={quizSearch} onChange={(event) => setQuizSearch(event.target.value)} />
+                <select className="select" value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
+                  {classOptions.map((item) => <option key={item}>{item === "All" ? "All Classes" : item}</option>)}
+                </select>
+                <select className="select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  {statusOptions.map((item) => <option key={item}>{item === "All" ? "All Status" : item}</option>)}
+                </select>
               </div>
             </div>
             <table className="table">
@@ -178,7 +201,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {summary.quizzes.map((quiz) => (
+                {filteredQuizzes.map((quiz) => (
                   <tr key={quiz.id}>
                     <td><strong>{quiz.name}</strong></td>
                     <td>{quiz.className}</td>
@@ -191,6 +214,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            {!filteredQuizzes.length ? <div className="pad"><p className="muted">No quizzes match the current filters.</p></div> : null}
           </section>
 
           <aside className="card pad">
@@ -198,7 +222,13 @@ export default function DashboardPage() {
             {quickActions.map((action, index) => {
               const icons = [Plus, Upload, Library, Wand2];
               const Icon = icons[index];
-              const href = index === 0 ? "/professor/create-quiz" : index === 2 ? "/professor/question-bank" : index === 3 ? "/professor/create-quiz?ai=open" : "/professor/templates";
+              const href = index === 0
+                ? "/professor/create-quiz"
+                : index === 1
+                  ? "/professor/question-bank"
+                  : index === 2
+                    ? "/professor/question-bank"
+                    : "/professor/create-quiz?ai=open";
               return (
                 <Link className="nav-link" href={href} key={action}>
                   <Icon size={17} />

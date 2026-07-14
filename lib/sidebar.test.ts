@@ -23,6 +23,15 @@ describe("role sidebar config", () => {
   });
 
   it("returns the admin navigation set", () => {
-    expect(getSidebarItems("admin").map((item) => item.href)).toContain("/admin/users");
+    const hrefs = getSidebarItems("admin").map((item) => item.href);
+    expect(hrefs).toContain("/admin/users");
+    expect(hrefs).toContain("/admin/reports");
+    expect(hrefs).toContain("/admin/integrations");
+  });
+
+  it("keeps settings and help reachable from the professor sidebar", () => {
+    const hrefs = getSidebarItems("professor").map((item) => item.href);
+    expect(hrefs).toContain("/professor/settings");
+    expect(hrefs).toContain("/professor/help");
   });
 });

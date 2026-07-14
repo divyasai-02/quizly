@@ -5,7 +5,7 @@ import { quizInclude, mapQuizSummary } from "@/lib/quizTransforms";
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const [classrooms, quizzes] = await Promise.all([
       prisma.classroom.findMany({ where: { professorId: user.id }, include: { students: true, quizzes: true } }),
       prisma.quiz.findMany({ where: { professorId: user.id }, include: quizInclude, orderBy: { createdAt: "desc" } })

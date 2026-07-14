@@ -20,7 +20,7 @@ export const demoUsers: Record<DemoRoleKey, DemoUserSession> = {
   professor: {
     id: "prof-john",
     name: "Prof. John Doe",
-    email: "johndoe@university.edu",
+    email: "professor@quizly.local",
     initials: "PJ",
     role: "PROFESSOR",
     roleKey: "professor",
@@ -30,7 +30,7 @@ export const demoUsers: Record<DemoRoleKey, DemoUserSession> = {
   student: {
     id: "student-arjun",
     name: "Arjun Mehta",
-    email: "arjun@student.edu",
+    email: "student@quizly.local",
     initials: "AM",
     role: "STUDENT",
     roleKey: "student",
@@ -40,12 +40,27 @@ export const demoUsers: Record<DemoRoleKey, DemoUserSession> = {
   admin: {
     id: "admin-demo",
     name: "Admin",
-    email: "admin@quizly.test",
+    email: "admin@quizly.local",
     initials: "AD",
     role: "ADMIN",
     roleKey: "admin",
     title: "Admin",
     subtitle: "Platform Operations"
+  }
+};
+
+export const demoLoginByRole: Record<DemoRoleKey, { email: string; password: string }> = {
+  professor: {
+    email: "professor@quizly.local",
+    password: "password123"
+  },
+  student: {
+    email: "student@quizly.local",
+    password: "password123"
+  },
+  admin: {
+    email: "admin@quizly.local",
+    password: "password123"
   }
 };
 
@@ -91,71 +106,4 @@ export function resolveDemoUser(userId?: string | null, roleKey?: string | null)
   }
 
   return null;
-}
-
-function persistCookies(user: DemoUserSession) {
-  const maxAge = 60 * 60 * 24 * 7;
-  document.cookie = `${DEMO_SESSION_COOKIE}=${encodeURIComponent(user.id)}; path=/; max-age=${maxAge}; samesite=lax`;
-  document.cookie = `${DEMO_ROLE_COOKIE}=${encodeURIComponent(user.roleKey)}; path=/; max-age=${maxAge}; samesite=lax`;
-}
-
-export function getCurrentUser() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const cookieMap = new Map(
-    document.cookie
-      .split(";")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const [key, ...rest] = entry.split("=");
-        return [key, decodeURIComponent(rest.join("="))] as const;
-      })
-  );
-
-  const cookieUser = resolveDemoUser(cookieMap.get(DEMO_SESSION_COOKIE), cookieMap.get(DEMO_ROLE_COOKIE));
-  if (cookieUser) {
-    window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(cookieUser));
-    return cookieUser;
-  }
-
-  const stored = window.localStorage.getItem(DEMO_SESSION_KEY);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored) as DemoUserSession;
-      const resolved = resolveDemoUser(parsed.id, parsed.roleKey);
-      if (resolved) return resolved;
-    } catch {
-      window.localStorage.removeItem(DEMO_SESSION_KEY);
-    }
-  }
-
-  return null;
-}
-
-export function getCurrentRole() {
-  return getCurrentUser()?.roleKey ?? null;
-}
-
-export function setDemoUser(input: DemoRoleKey | DemoUserSession) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const user = typeof input === "string" ? demoUsers[input] : input;
-  window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
-  persistCookies(user);
-  return user;
-}
-
-export function clearSession() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem(DEMO_SESSION_KEY);
-  document.cookie = `${DEMO_SESSION_COOKIE}=; path=/; max-age=0; samesite=lax`;
-  document.cookie = `${DEMO_ROLE_COOKIE}=; path=/; max-age=0; samesite=lax`;
 }

@@ -5,7 +5,7 @@ import { mapQuizSummary, quizInclude } from "@/lib/quizTransforms";
 
 export async function GET(request: Request) {
   try {
-    const user = requireStudent(request);
+    const user = await requireStudent(request);
     const classrooms = await prisma.classroomStudent.findMany({
       where: { studentId: user.id },
       include: {

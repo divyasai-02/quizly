@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
-  Bell,
   BookOpen,
   CircleHelp,
   FileQuestion,
@@ -29,8 +28,11 @@ import {
   Users,
   X
 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Badge } from "@/components/ui";
-import { clearSession, getCurrentUser, getRoleLabel, type DemoUserSession } from "@/lib/demoSession";
+import { logout, refreshSession } from "@/lib/authClient";
+import type { AppSessionUser } from "@/lib/auth/types";
+import { getRoleLabel } from "@/lib/demoSession";
 import { getSidebarItems } from "@/lib/sidebar";
 
 const iconMap = {
@@ -52,7 +54,8 @@ const iconMap = {
   Profile: UserCircle2,
   Home: LayoutDashboard,
   Subjects: Puzzle,
-  Users: Users
+  Users: Users,
+  Integrations: Puzzle
 } as const;
 
 export function AppShell({
@@ -67,25 +70,54 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<DemoUserSession | null>(null);
+  const [user, setUser] = useState<AppSessionUser | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setUser(getCurrentUser());
+    let cancelled = false;
+
+    refreshSession()
+      .then((payload) => {
+        if (!cancelled) {
+          setUser(payload ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUser(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const navItems = useMemo(() => getSidebarItems(user?.roleKey ?? "professor"), [user?.roleKey]);
 
-  function handleLogout() {
-    clearSession();
-    router.push("/");
-    router.refresh();
+  function runShellSearch() {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return;
+    const match = navItems.find((item) => item.label.toLowerCase().includes(query) || item.href.toLowerCase().includes(query));
+    if (match) {
+      setSearchMessage(null);
+      setSearchQuery("");
+      router.push(match.href);
+      return;
+    }
+    setSearchMessage("No matching page in this role.");
   }
 
-  function handleSwitchRole() {
-    clearSession();
+  async function handleLogout() {
+    await logout().catch(() => null);
+    window.location.assign("/");
+  }
+
+  async function handleSwitchRole() {
     setMenuOpen(false);
-    router.push("/");
-    router.refresh();
+    await logout().catch(() => null);
+    window.location.assign("/");
   }
 
   return (
@@ -153,12 +185,20 @@ export function AppShell({
           </div>
           <label className="search">
             <Search size={18} />
-            <input placeholder="Search quizzes, classes, users..." />
+            <input
+              placeholder="Search pages, classes, users..."
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setSearchMessage(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") runShellSearch();
+              }}
+            />
           </label>
-          <button className="icon-button" aria-label="Notifications" type="button">
-            <Bell size={20} />
-            <span className="dot">3</span>
-          </button>
+          {searchMessage ? <span className="muted small">{searchMessage}</span> : null}
+          {user ? <NotificationBell user={user} pathname={pathname} /> : null}
           {user ? (
             <div className="topbar-user">
               <div className="topbar-user-meta">

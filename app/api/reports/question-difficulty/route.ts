@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
 import { requireProfessor } from "@/lib/serverSession";
+import { NotificationType, UserRole } from "@prisma/client";
+import { createNotification } from "@/lib/services/notificationService";
 import { buildQuestionDifficultyCsv, csvTableToString, loadReportingDataset, type ReportFilters } from "@/lib/services/reportingService";
 
 function getFilters(request: Request): ReportFilters {
@@ -16,12 +18,23 @@ function getFilters(request: Request): ReportFilters {
 
 export async function GET(request: Request) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const dataset = await loadReportingDataset(prisma, { professorId: user.id });
     const csv = buildQuestionDifficultyCsv(dataset, getFilters(request));
     const { searchParams } = new URL(request.url);
 
     if (searchParams.get("format") === "csv") {
+      await createNotification({
+        userId: user.id,
+        role: UserRole.PROFESSOR,
+        context: "reports",
+        type: NotificationType.REPORT_GENERATED,
+        title: "Question difficulty report exported",
+        message: `Your question difficulty CSV export is ready: ${csv.fileName}.`,
+        actionUrl: "/professor/reports"
+      }).catch((error) => {
+        console.error("[quizly-notifications] failed to create question-difficulty report notification", error);
+      });
       return new Response(csvTableToString(csv), {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",

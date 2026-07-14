@@ -6,9 +6,11 @@ import { validateQuestionInput, validateQuizTitle } from "@/lib/validation";
 
 type Params = { params: { id: string } };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
+    const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id }, include: quizInclude });
+    if (quiz.professorId !== user.id) throw new Error("Only the professor who owns this quiz can view it.");
     return json(mapQuizDetail(quiz));
   } catch (error) {
     return errorResponse(error);
@@ -17,7 +19,7 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PUT(request: Request, { params }: Params) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const body = await readJson<{
       title?: string;
       description?: string;
@@ -74,7 +76,7 @@ export async function PUT(request: Request, { params }: Params) {
                   required: question.required ?? true,
                   shuffleOptions: question.shuffle ?? false,
                   orderIndex,
-                  sourceLabel: (question as { sourceLabel?: string }).sourceLabel ?? "Manual",
+                  sourceLabel: question.sourceLabel ?? "Manual",
                   options: {
                     create: question.options.map((text, index) => ({
                       text,
@@ -98,7 +100,7 @@ export async function PUT(request: Request, { params }: Params) {
 
 export async function DELETE(request: Request, { params }: Params) {
   try {
-    const user = requireProfessor(request);
+    const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id } });
     if (quiz.professorId !== user.id) throw new Error("Only the professor who owns this quiz can delete it.");
     await prisma.quiz.delete({ where: { id: params.id } });

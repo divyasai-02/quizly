@@ -5,7 +5,7 @@ import { buildAdminUsersView, loadReportingDataset } from "@/lib/services/report
 
 export async function GET(request: Request) {
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
     const dataset = await loadReportingDataset(prisma);
     return json({ users: buildAdminUsersView(dataset) });
   } catch (error) {
