@@ -1,75 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Badge } from "@/components/ui";
-import { login } from "@/lib/authClient";
-import { demoLoginByRole, demoUsers, getRoleHome } from "@/lib/demoSession";
-
-const roleOptions = [
-  { role: "professor" as const, label: "Professor", text: "Create quizzes and manage classes" },
-  { role: "student" as const, label: "Student", text: "Take quizzes and track your progress" },
-  { role: "admin" as const, label: "Administrator", text: "Manage users and platform activity" }
-];
+import { LogIn, UserPlus } from "lucide-react";
 
 export function LandingPage() {
-  const [selectedRole, setSelectedRole] = useState<keyof typeof demoUsers>("student");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleContinue(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await login(demoLoginByRole[selectedRole]);
-      window.location.assign(getRoleHome(result.user.roleKey));
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Demo login failed.");
-      setLoading(false);
-    }
-  }
-
   return (
     <main className="landing-shell">
-      <section className="landing-hero role-choice-hero">
+      <section className="landing-hero auth-choice-hero">
         <div className="role-choice-intro">
-          <Badge tone="purple">Welcome to Quizly</Badge>
-          <h1>Choose your role</h1>
-          <p className="muted">Select how you want to use Quizly to continue.</p>
+          <div className="badge purple">Welcome to Quizly</div>
+          <h1>Sign in or create an account</h1>
+          <p className="muted">Use your Quizly account to continue to your dashboard.</p>
         </div>
 
-        <form className="role-choice-form" onSubmit={handleContinue}>
-          <span className="role-choice-label">I am a...</span>
-          <div className="role-options">
-            {roleOptions.map(({ role, label, text }) => (
-              <label className={`role-option ${selectedRole === role ? "selected" : ""}`} key={role}>
-                <input
-                  checked={selectedRole === role}
-                  name="role"
-                  onChange={() => setSelectedRole(role)}
-                  type="radio"
-                  value={role}
-                />
-                <span>
-                  <strong>{label}</strong>
-                  <small>{text}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-          {error ? <div className="notice">{error}</div> : null}
-          <button className="btn primary full" disabled={loading} type="submit">
-            {loading ? "Signing in..." : "Continue"}
-          </button>
-        </form>
-
-        <div className="role-choice-links">
-          <span className="muted small">Already have an account?</span>
-          <Link href="/login">Sign in</Link>
-          <span className="muted small">or</span>
-          <Link href="/register">create an account</Link>
+        <div className="auth-choice-grid">
+          <Link className="card pad auth-choice-card" href="/login">
+            <div className="icon-tile purple"><LogIn size={24} /></div>
+            <div>
+              <h2>Sign in</h2>
+              <p className="muted small">Already have an account? Continue with your email and password.</p>
+            </div>
+            <span className="btn primary full">Sign in</span>
+          </Link>
+          <Link className="card pad auth-choice-card" href="/register">
+            <div className="icon-tile blue"><UserPlus size={24} /></div>
+            <div>
+              <h2>Create account</h2>
+              <p className="muted small">Choose your role, then register with email and password.</p>
+            </div>
+            <span className="btn full">Create account</span>
+          </Link>
         </div>
       </section>
     </main>

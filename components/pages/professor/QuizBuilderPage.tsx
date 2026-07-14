@@ -400,7 +400,7 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
         ))}
       </div>
 
-      <div className="wizard">
+      <div className="wizard quiz-builder-layout">
         <section className="card question-list">
           <div className="section-head" style={{ padding: "16px 16px 0" }}>
             <h3>Questions ({questions.length})</h3>
@@ -424,27 +424,35 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
           </div>
         </section>
 
-        <section className="card pad">
-          <div className="soft-panel" style={{ padding: 16, marginBottom: 18 }}>
-            <Badge tone={draftId ? "amber" : "purple"}>{draftId ? "Editing draft" : "New quiz draft"}</Badge>
-            <div className="grid grid-2" style={{ marginTop: 12 }}>
-              <label><strong>Quiz title</strong><input className="input" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-              <label><strong>Quiz goal</strong><input className="input" value={goal} onChange={(event) => setGoal(event.target.value)} /></label>
+        <section className="quiz-editor-stack">
+          <section className="card pad quiz-details-panel">
+            <div className="section-head">
+              <div>
+                <Badge tone={draftId ? "amber" : "purple"}>{draftId ? "Editing draft" : "New quiz draft"}</Badge>
+                <h3 style={{ marginTop: 10 }}>Quiz Details</h3>
+              </div>
+              <div className="quiz-details-actions">
+                <Link className="btn" href="/professor/templates"><BookOpen size={17} />Use Template</Link>
+                <button className="btn ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
+              </div>
+            </div>
+            <div className="quiz-details-grid">
+              <label className="field-wide"><strong>Quiz title</strong><input className="input" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
               <label><strong>Subject</strong><input className="input" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
               <label><strong>Topic</strong><input className="input" value={topic} onChange={(event) => setTopic(event.target.value)} /></label>
+              <label><strong>Difficulty</strong>
+                <select className="select" value={difficulty} onChange={(event) => setDifficulty(event.target.value as AiDifficulty)}>
+                  <option>Easy</option>
+                  <option>Medium</option>
+                  <option>Hard</option>
+                  <option>Mixed</option>
+                </select>
+              </label>
+              <label className="field-wide"><strong>Quiz goal</strong><textarea className="textarea compact" value={goal} onChange={(event) => setGoal(event.target.value)} /></label>
             </div>
-            <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-              <select className="select" value={difficulty} onChange={(event) => setDifficulty(event.target.value as AiDifficulty)} style={{ maxWidth: 180 }}>
-                <option>Easy</option>
-                <option>Medium</option>
-                <option>Hard</option>
-                <option>Mixed</option>
-              </select>
-              <Link className="btn" href="/professor/templates"><BookOpen size={17} />Use Template</Link>
-              <button className="btn ghost" onClick={() => setShowAiPanel(true)} type="button"><Sparkles size={17} />Generate with AI</button>
-            </div>
-            <p className="muted small">Use the question bank for reusable items, templates for faster starts, and AI drafts as a professor-reviewed teaching assistant workflow.</p>
-          </div>
+          </section>
+
+          <section className="card pad quiz-question-panel">
           {validationErrors.length ? (
             <div className="notice" style={{ marginBottom: 18 }}>
               <strong>Before publishing:</strong>
@@ -469,64 +477,73 @@ export function QuizBuilderPage({ quizId, initialAiState }: { quizId?: string; i
             </div>
           </div>
 
-          <label><strong>Question Text *</strong></label>
-          <div className="editor-toolbar">
-            {[
-              { icon: Bold, action: "bold", label: "Bold" },
-              { icon: Italic, action: "italic", label: "Italic" },
-              { icon: Underline, action: "underline", label: "Underline" },
-              { icon: List, action: "list", label: "Bullets" },
-              { icon: Code, action: "code", label: "Code" },
-              { icon: LinkIcon, action: "link", label: "Link" },
-              { icon: ImageIcon, action: "image", label: "Image reference" }
-            ].map(({ icon: Icon, action, label }) => (
-              <button className="linkish" onClick={() => applyEditorAction(action as EditorAction)} title={label} key={action} type="button"><Icon size={17} /></button>
-            ))}
-          </div>
-          <textarea className="textarea" value={question.text} onChange={(event) => updateQuestion({ text: event.target.value, sourceLabel: question.sourceLabel ?? "Manual" })} />
-          <button className="btn" style={{ marginTop: 10 }} onClick={addImageReference} type="button"><ImageIcon size={17} />Add image reference</button>
-
-          <div className="section-head" style={{ marginTop: 18 }}>
-            <h3>{question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted Answer *" : "Options *"}</h3>
-            {question.type === "Multiple Answer" ? <Badge tone="blue">Select more than one correct answer if needed</Badge> : null}
-          </div>
-          <div className="grid">
-            {question.options.map((option, index) => {
-              const selected = normalizedCorrectAnswers(question).includes(index);
-              return (
-                <div className={`option-row ${selected ? "correct" : ""}`} key={`${question.id}-${index}`}>
-                  <button className="radio-dot" onClick={() => toggleCorrectAnswer(index)} aria-label={`Mark option ${index + 1} correct`} type="button" />
-                  <input className="input" value={option} onChange={(event) => updateOption(index, event.target.value)} />
-                  {selected ? <Badge tone="green">Correct answer</Badge> : null}
-                  <button className="icon-button" aria-label="Remove option" onClick={() => updateQuestion({ options: question.options.filter((_, optionIndex) => optionIndex !== index), correct: 0, correctAnswers: [0] })} type="button">
-                    <Trash2 size={15} color="var(--pink)" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <button className="linkish" style={{ marginTop: 14 }} onClick={() => updateQuestion({ options: [...question.options, question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted answer" : `Option ${question.options.length + 1}`] })} type="button">
-            <Plus size={16} /> Add Option
-          </button>
-
-          <div className="section-head" style={{ marginTop: 18 }}>
-            <h3>Explanation (Optional)</h3>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn" onClick={handleGenerateExplanation} type="button"><Wand2 size={16} />Generate explanation</button>
-              <button className="btn" onClick={() => applyAiQuestionEdit("improve")} disabled={!!aiEditAction} type="button">{aiEditAction === "improve" ? "Improving..." : "Improve wording"}</button>
-              <button className="btn" onClick={() => applyAiQuestionEdit("easier")} disabled={!!aiEditAction} type="button">{aiEditAction === "easier" ? "Rewriting..." : "Make easier"}</button>
-              <button className="btn" onClick={() => applyAiQuestionEdit("harder")} disabled={!!aiEditAction} type="button">{aiEditAction === "harder" ? "Rewriting..." : "Make harder"}</button>
+          <div className="builder-section">
+            <div className="builder-section-title">
+              <strong>Question Text *</strong>
+              <button className="btn" onClick={addImageReference} type="button"><ImageIcon size={17} />Add image</button>
             </div>
+            <div className="editor-toolbar">
+              {[
+                { icon: Bold, action: "bold", label: "Bold" },
+                { icon: Italic, action: "italic", label: "Italic" },
+                { icon: Underline, action: "underline", label: "Underline" },
+                { icon: List, action: "list", label: "Bullets" },
+                { icon: Code, action: "code", label: "Code" },
+                { icon: LinkIcon, action: "link", label: "Link" },
+                { icon: ImageIcon, action: "image", label: "Image reference" }
+              ].map(({ icon: Icon, action, label }) => (
+                <button className="linkish" onClick={() => applyEditorAction(action as EditorAction)} title={label} key={action} type="button"><Icon size={17} /></button>
+              ))}
+            </div>
+            <textarea className="textarea question-textarea" value={question.text} onChange={(event) => updateQuestion({ text: event.target.value, sourceLabel: question.sourceLabel ?? "Manual" })} />
           </div>
-          <textarea className="textarea" value={question.explanation} onChange={(event) => updateQuestion({ explanation: event.target.value })} />
 
-          <div className="section-head" style={{ marginTop: 18 }}>
+          <div className="builder-section">
+            <div className="builder-section-title">
+              <h3>{question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted Answer *" : "Options *"}</h3>
+              {question.type === "Multiple Answer" ? <Badge tone="blue">Multiple correct answers allowed</Badge> : null}
+            </div>
+            <div className="grid">
+              {question.options.map((option, index) => {
+                const selected = normalizedCorrectAnswers(question).includes(index);
+                return (
+                  <div className={`option-row ${selected ? "correct" : ""}`} key={`${question.id}-${index}`}>
+                    <button className="radio-dot" onClick={() => toggleCorrectAnswer(index)} aria-label={`Mark option ${index + 1} correct`} type="button" />
+                    <input className="input" value={option} onChange={(event) => updateOption(index, event.target.value)} />
+                    {selected ? <Badge tone="green">Correct answer</Badge> : null}
+                    <button className="icon-button" aria-label="Remove option" onClick={() => updateQuestion({ options: question.options.filter((_, optionIndex) => optionIndex !== index), correct: 0, correctAnswers: [0] })} type="button">
+                      <Trash2 size={15} color="var(--pink)" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="linkish" style={{ marginTop: 14 }} onClick={() => updateQuestion({ options: [...question.options, question.type === "Short Answer" || question.type === "Fill in the Blank" ? "Accepted answer" : `Option ${question.options.length + 1}`] })} type="button">
+              <Plus size={16} /> Add Option
+            </button>
+          </div>
+
+          <div className="builder-section">
+            <div className="section-head">
+              <h3>Explanation</h3>
+              <div className="quiz-ai-actions">
+                <button className="btn" onClick={handleGenerateExplanation} type="button"><Wand2 size={16} />Generate</button>
+                <button className="btn" onClick={() => applyAiQuestionEdit("improve")} disabled={!!aiEditAction} type="button">{aiEditAction === "improve" ? "Improving..." : "Improve"}</button>
+                <button className="btn" onClick={() => applyAiQuestionEdit("easier")} disabled={!!aiEditAction} type="button">{aiEditAction === "easier" ? "Rewriting..." : "Easier"}</button>
+                <button className="btn" onClick={() => applyAiQuestionEdit("harder")} disabled={!!aiEditAction} type="button">{aiEditAction === "harder" ? "Rewriting..." : "Harder"}</button>
+              </div>
+            </div>
+            <textarea className="textarea compact" value={question.explanation} onChange={(event) => updateQuestion({ explanation: event.target.value })} />
+          </div>
+
+          <div className="section-head builder-navigation">
             <button className="btn" onClick={duplicateQuestion} type="button"><Copy size={17} />Duplicate Question</button>
             <div style={{ display: "flex", gap: 12 }}>
               <button className="btn" disabled={active === 0} onClick={() => setActive(Math.max(0, active - 1))} type="button">Previous</button>
               <button className="btn primary" onClick={() => setActive(Math.min(questions.length - 1, active + 1))} type="button">Next</button>
             </div>
           </div>
+        </section>
         </section>
 
         <aside className="grid">

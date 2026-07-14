@@ -11,6 +11,8 @@ coverage
 *.db
 *.db-journal
 prisma/dev.db
+.local-postgres-data
+postgres-local.log
 
 output/playwright
 playwright-report

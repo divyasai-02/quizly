@@ -73,8 +73,8 @@ export default function InstructionsPage({ params }: { params: { id: string } })
             <Link className="btn primary full" href={`/quiz/${params.id}/take`}><PlayCircle size={19} />Start Quiz</Link>
           ) : (
             <div className="grid">
-              <div className="notice">Quiz taking is student-first in this demo. Switch to the Student role to complete the full attempt flow.</div>
-              <Link className="btn full" href="/demo/logout">Switch Demo Role</Link>
+              <div className="notice">Quiz taking is available to student accounts.</div>
+              <Link className="btn full" href="/dashboard">Back to Dashboard</Link>
             </div>
           )}
         </div>}

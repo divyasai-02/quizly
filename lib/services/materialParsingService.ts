@@ -129,7 +129,7 @@ export async function parseTextFile(buffer: Buffer, name: string, type: string) 
 }
 
 export async function parsePdfFile(buffer: Buffer, name: string, type: string) {
-  const pdfModule = await import("pdf-parse/lib/pdf-parse.js");
+  const pdfModule = await import("pdf-parse");
   const pdfParse = pdfModule.default as (data: Buffer) => Promise<{ text?: string; numpages?: number }>;
   const result = await pdfParse(buffer);
   return buildParsedMaterial({

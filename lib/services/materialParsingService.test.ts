@@ -11,7 +11,7 @@ import {
   parseTextFile
 } from "@/lib/services/materialParsingService";
 
-vi.mock("pdf-parse/lib/pdf-parse.js", () => ({
+vi.mock("pdf-parse", () => ({
   default: vi.fn(async () => ({
     text: "Database normalization reduces redundancy.",
     numpages: 1

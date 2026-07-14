@@ -9,7 +9,6 @@ import {
   CircleHelp,
   FileQuestion,
   FileText,
-  Flag,
   GraduationCap,
   Home,
   LayoutDashboard,
@@ -114,12 +113,6 @@ export function AppShell({
     window.location.assign("/");
   }
 
-  async function handleSwitchRole() {
-    setMenuOpen(false);
-    await logout().catch(() => null);
-    window.location.assign("/");
-  }
-
   return (
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
@@ -165,10 +158,6 @@ export function AppShell({
             <button className="nav-link" onClick={handleLogout} type="button">
               <LogOut size={20} />
               Logout
-            </button>
-            <button className="nav-link" onClick={handleSwitchRole} type="button">
-              <Flag size={20} />
-              Switch Demo Role
             </button>
           </div>
         </nav>

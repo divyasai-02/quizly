@@ -8,10 +8,8 @@ import { register } from "@/lib/authClient";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
-    name: "",
     email: "",
     password: "",
-    confirmPassword: "",
     role: "STUDENT" as "STUDENT" | "PROFESSOR"
   });
   const [loading, setLoading] = useState(false);
@@ -23,7 +21,13 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      const result = await register(form);
+      const emailName = form.email.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+      const name = emailName && emailName.length >= 2 ? emailName : `${form.role === "PROFESSOR" ? "Professor" : "Student"} User`;
+      const result = await register({
+        ...form,
+        name,
+        confirmPassword: form.password
+      });
       window.location.assign(getRoleHome(result.user.roleKey));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Registration failed.");
@@ -38,14 +42,17 @@ export default function RegisterPage() {
         <div className="badge purple">Create account</div>
         <h1>Register a new Quizly account.</h1>
         <p className="muted">
-          Public registration is available for Students and Professors. Admin accounts stay seed-only in this local auth phase.
+          Select a role and create your account with an email and password.
         </p>
 
         <section className="card pad" style={{ maxWidth: 460 }}>
           <form className="grid" onSubmit={handleSubmit}>
             <label>
-              <strong>Name</strong>
-              <input className="input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Your name" />
+              <strong>Role</strong>
+              <select className="select" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as "STUDENT" | "PROFESSOR" }))}>
+                <option value="STUDENT">Student</option>
+                <option value="PROFESSOR">Professor</option>
+              </select>
             </label>
             <label>
               <strong>Email</strong>
@@ -54,17 +61,6 @@ export default function RegisterPage() {
             <label>
               <strong>Password</strong>
               <input className="input" type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder="At least 8 characters" />
-            </label>
-            <label>
-              <strong>Confirm password</strong>
-              <input className="input" type="password" value={form.confirmPassword} onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))} placeholder="Repeat your password" />
-            </label>
-            <label>
-              <strong>Role</strong>
-              <select className="select" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as "STUDENT" | "PROFESSOR" }))}>
-                <option value="STUDENT">Student</option>
-                <option value="PROFESSOR">Professor</option>
-              </select>
             </label>
             {error ? <div className="notice">{error}</div> : null}
             <button className="btn primary full" type="submit" disabled={loading}>
