@@ -3,7 +3,14 @@ import { normalizeRoleKey, type DemoRoleKey } from "@/lib/demoSession";
 export const AUTH_COOKIE = "quizly-auth";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-const AUTH_SECRET = process.env.QUIZLY_AUTH_SECRET ?? process.env.AUTH_SECRET ?? "quizly-local-auth-secret-change-me";
+function getAuthSecret() {
+  const secret = process.env.QUIZLY_AUTH_SECRET || process.env.AUTH_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("QUIZLY_AUTH_SECRET must be configured for production sessions");
+  }
+  return "quizly-local-auth-secret-change-me";
+}
 
 type SessionTokenPayload = {
   exp: number;
@@ -22,7 +29,7 @@ function base64UrlDecode(value: string) {
 async function importAuthKey() {
   return crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(AUTH_SECRET),
+    new TextEncoder().encode(getAuthSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
