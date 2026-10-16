@@ -4,7 +4,8 @@ import { errorResponse, json } from "@/lib/http";
 import { requireProfessor } from "@/lib/serverSession";
 import { buildTemplateQuizData, getTemplateById } from "@/lib/templates";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const template = getTemplateById(params.id);

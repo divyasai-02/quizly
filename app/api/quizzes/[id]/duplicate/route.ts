@@ -4,9 +4,10 @@ import { errorResponse, json } from "@/lib/http";
 import { requireProfessor } from "@/lib/serverSession";
 import { mapQuizDetail, quizInclude } from "@/lib/quizTransforms";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const source = await prisma.quiz.findUniqueOrThrow({

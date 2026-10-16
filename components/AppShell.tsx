@@ -110,7 +110,9 @@ export function AppShell({
 
   async function handleLogout() {
     await logout().catch(() => null);
-    window.location.assign("/");
+    setUser(null);
+    router.replace("/");
+    router.refresh();
   }
 
   return (

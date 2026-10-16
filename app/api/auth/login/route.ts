@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     assertRateLimit(request, { key: "auth.login", limit: 10, windowMs: 60_000 });
     const user = await authenticateUser(await readJson<{ email?: string; password?: string }>(request));
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     clearLegacyDemoCookies(cookieStore);
     cookieStore.set(AUTH_COOKIE, await createSessionToken({ userId: user.id, roleKey: user.roleKey }), getAuthCookieOptions());
     return json({ user });

@@ -23,7 +23,8 @@ function cleanSubject(value?: string) {
   return next;
 }
 
-export async function PATCH(request: Request, { params }: { params: { subject: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ subject: string }> }) {
+  const params = await props.params;
   try {
     const actor = await requireAdmin(request);
     const sourceSubject = decodeSubject(params.subject);

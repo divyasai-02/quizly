@@ -4,9 +4,10 @@ import { requireProfessor } from "@/lib/serverSession";
 import { mapQuizDetail, quizInclude, questionTypeFromUi } from "@/lib/quizTransforms";
 import { validateQuestionInput, validateQuizTitle } from "@/lib/validation";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, { params }: Params) {
+export async function GET(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id }, include: quizInclude });
@@ -17,7 +18,8 @@ export async function GET(request: Request, { params }: Params) {
   }
 }
 
-export async function PUT(request: Request, { params }: Params) {
+export async function PUT(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const body = await readJson<{
@@ -98,7 +100,8 @@ export async function PUT(request: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(request: Request, { params }: Params) {
+export async function DELETE(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id } });

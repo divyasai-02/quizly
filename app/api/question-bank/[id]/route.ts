@@ -4,7 +4,8 @@ import { buildQuestionBankWriteData, mapQuestionBankItem, type QuestionBankInput
 import { requireProfessor } from "@/lib/serverSession";
 import { validateQuestionBankItemInput } from "@/lib/validation";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const item = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
@@ -15,7 +16,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const existing = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
@@ -41,7 +43,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const existing = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });

@@ -3,7 +3,8 @@ import { errorResponse, json } from "@/lib/http";
 import { requireStudent } from "@/lib/serverSession";
 import { summarizeAttemptLearning } from "@/lib/services/studentLearningService";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireStudent(request);
     const attempt = await prisma.quizAttempt.findUniqueOrThrow({

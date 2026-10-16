@@ -1,10 +1,11 @@
 import { QuizBuilderPage } from "@/components/pages/professor/QuizBuilderPage";
 
-export default function ProfessorCreateQuizPage({
-  searchParams
-}: {
-  searchParams?: Record<string, string | string[] | undefined>;
-}) {
+export default async function ProfessorCreateQuizPage(
+  props: {
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const aiOpen = searchParams?.ai === "open";
   const topic = typeof searchParams?.topic === "string" ? searchParams.topic : undefined;
   const subject = typeof searchParams?.subject === "string" ? searchParams.subject : undefined;

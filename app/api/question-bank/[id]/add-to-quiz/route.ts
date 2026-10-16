@@ -2,7 +2,8 @@ import { errorResponse, json, readJson } from "@/lib/http";
 import { addQuestionBankItemToQuiz } from "@/lib/questionBank";
 import { requireProfessor } from "@/lib/serverSession";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const body = await readJson<{ quizId?: string }>(request);

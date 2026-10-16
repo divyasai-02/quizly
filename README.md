@@ -4,7 +4,7 @@ Quizly is a full-stack Next.js quiz platform with professor, student, and admin 
 
 ## Tech Stack
 
-- Next.js 14
+- Next.js 16
 - React 18
 - Prisma ORM
 - PostgreSQL for local/staging/production-ready database workflows
@@ -13,16 +13,16 @@ Quizly is a full-stack Next.js quiz platform with professor, student, and admin 
 
 ## Local Setup
 
-1. Install dependencies:
-
-```bash
-npm install
-```
-
-2. Copy environment values:
+1. Copy environment values before installing dependencies (Prisma generates its client during install):
 
 ```bash
 cp .env.example .env
+```
+
+2. Install dependencies:
+
+```bash
+npm install
 ```
 
 3. Start PostgreSQL:

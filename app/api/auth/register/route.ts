@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       }>(request)
     );
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     clearLegacyDemoCookies(cookieStore);
     cookieStore.set(AUTH_COOKIE, await createSessionToken({ userId: user.id, roleKey: user.roleKey }), getAuthCookieOptions());
     await createRoleNotifications(UserRole.ADMIN, {

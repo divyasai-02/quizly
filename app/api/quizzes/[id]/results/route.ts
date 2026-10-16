@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { errorResponse, json } from "@/lib/http";
 import { requireProfessor } from "@/lib/serverSession";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({ where: { id: params.id } });

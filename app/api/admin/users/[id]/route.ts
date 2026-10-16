@@ -37,7 +37,8 @@ async function ensureAdminContinuity(targetId: string, actorId: string, role?: U
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const actor = await requireAdmin(request);
     const body = await readJson<AdminUserAction>(request);

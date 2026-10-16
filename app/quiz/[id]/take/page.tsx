@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bookmark, Clock, MoreVertical, Trash2 } from "lucide-react";
 import { SkeletonCard } from "@/components/ui";
 import { attemptApi, quizApi } from "@/lib/apiClient";
 
-export default function TakeQuizPage({ params }: { params: { id: string } }) {
+export default function TakeQuizPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const router = useRouter();
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number | undefined>>({});

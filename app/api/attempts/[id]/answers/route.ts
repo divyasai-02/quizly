@@ -9,7 +9,8 @@ type AnswerPayload = {
   textAnswer?: string;
 };
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireStudent(request);
     const body = await readJson<{ answers?: AnswerPayload[]; answer?: AnswerPayload }>(request);

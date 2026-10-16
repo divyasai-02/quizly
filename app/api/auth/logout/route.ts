@@ -5,7 +5,7 @@ import { errorResponse, json } from "@/lib/http";
 
 export async function POST() {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     clearAuthCookie(cookieStore);
     clearLegacyDemoCookies(cookieStore);
     return json({ success: true });

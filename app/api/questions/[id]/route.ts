@@ -4,9 +4,10 @@ import { requireProfessor } from "@/lib/serverSession";
 import { questionTypeFromUi } from "@/lib/quizTransforms";
 import { validateQuestionInput } from "@/lib/validation";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export async function PUT(request: Request, { params }: Params) {
+export async function PUT(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const existing = await prisma.question.findUniqueOrThrow({
@@ -57,7 +58,8 @@ export async function PUT(request: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(request: Request, { params }: Params) {
+export async function DELETE(request: Request, props: Params) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const existing = await prisma.question.findUniqueOrThrow({ where: { id: params.id }, include: { quiz: true } });

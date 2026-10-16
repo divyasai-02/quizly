@@ -10,16 +10,16 @@ type RequestWithCookies = Request & {
   };
 };
 
-function getCookieValue(request: RequestWithCookies | undefined, name: string) {
+async function getCookieValue(request: RequestWithCookies | undefined, name: string) {
   if (request?.cookies?.get) {
     return request.cookies.get(name)?.value;
   }
 
-  return cookies().get(name)?.value;
+  return (await cookies()).get(name)?.value;
 }
 
 export async function getServerUser(request?: RequestWithCookies) {
-  const session = await readSessionToken(getCookieValue(request, AUTH_COOKIE));
+  const session = await readSessionToken(await getCookieValue(request, AUTH_COOKIE));
   if (!session) return null;
   return findUserById(session.userId);
 }

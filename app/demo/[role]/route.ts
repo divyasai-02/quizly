@@ -6,8 +6,9 @@ import { buildSessionUser } from "@/lib/auth/service";
 import { clearLegacyDemoCookies } from "@/lib/demoAuth";
 import { demoLoginByRole, getRoleHome, normalizeRoleKey } from "@/lib/demoSession";
 
-export async function GET(_request: Request, { params }: { params: { role: string } }) {
-  const role = normalizeRoleKey(params.role);
+export async function GET(_request: Request, { params }: { params: Promise<{ role: string }> }) {
+  if (process.env.NODE_ENV === "production") return new Response("Not Found", { status: 404 });
+  const role = normalizeRoleKey((await params).role);
   if (!role) {
     return NextResponse.redirect(new URL("/", "http://localhost"));
   }
@@ -29,7 +30,7 @@ export async function GET(_request: Request, { params }: { params: { role: strin
     return NextResponse.redirect(new URL("/", "http://localhost"));
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   clearAuthCookie(cookieStore);
   clearLegacyDemoCookies(cookieStore);
   cookieStore.set(AUTH_COOKIE, await createSessionToken({ userId: user.id, roleKey: user.roleKey }), getAuthCookieOptions());

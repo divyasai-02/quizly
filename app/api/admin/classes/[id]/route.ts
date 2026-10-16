@@ -16,7 +16,8 @@ function cleanText(value: string | undefined, fallback: string) {
   return next?.length ? next : fallback;
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const actor = await requireAdmin(request);
     const body = await readJson<ClassUpdateInput>(request);

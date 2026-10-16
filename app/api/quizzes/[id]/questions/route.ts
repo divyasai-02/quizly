@@ -4,7 +4,8 @@ import { requireProfessor } from "@/lib/serverSession";
 import { questionTypeFromUi } from "@/lib/quizTransforms";
 import { validateQuestionInput } from "@/lib/validation";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({

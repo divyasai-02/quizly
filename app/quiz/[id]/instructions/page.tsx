@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Expand, ListChecks, PlayCircle, Star, Trophy } from "lucide-react";
 import { SkeletonBlock, SkeletonCard } from "@/components/ui";
 import { quizApi } from "@/lib/apiClient";
 
-export default function InstructionsPage({ params }: { params: { id: string } }) {
+export default function InstructionsPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const [quiz, setQuiz] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);

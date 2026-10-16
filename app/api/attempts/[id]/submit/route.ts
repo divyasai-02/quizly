@@ -6,7 +6,8 @@ import { aiService } from "@/lib/services/aiService";
 import { createNotifications, type CreateNotificationInput } from "@/lib/services/notificationService";
 import { scoreAttempt, type AnswerInput } from "@/lib/services/scoring";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireStudent(request);
     const body = await readJson<{ answers?: AnswerInput[]; autoSubmitted?: boolean }>(request);

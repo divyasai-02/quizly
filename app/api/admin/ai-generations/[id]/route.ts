@@ -33,7 +33,8 @@ function updateForAction(action: ModerationActionInput["action"], actorId: strin
   throw new Error("Choose a valid moderation action.");
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const actor = await requireAdmin(request);
     const body = await readJson<ModerationActionInput>(request);

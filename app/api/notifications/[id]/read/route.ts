@@ -2,7 +2,8 @@ import { markNotificationRead, userRoleFromRoleKey } from "@/lib/services/notifi
 import { errorResponse, json } from "@/lib/http";
 import { requireServerUser } from "@/lib/serverSession";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireServerUser(request);
     return json(await markNotificationRead(params.id, user.id, userRoleFromRoleKey(user.roleKey)));

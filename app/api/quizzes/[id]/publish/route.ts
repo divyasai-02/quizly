@@ -6,7 +6,8 @@ import { mapQuizDetail, quizInclude } from "@/lib/quizTransforms";
 import { createNotifications } from "@/lib/services/notificationService";
 import { validatePublish } from "@/lib/validation";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const quiz = await prisma.quiz.findUniqueOrThrow({

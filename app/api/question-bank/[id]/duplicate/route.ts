@@ -3,7 +3,8 @@ import { errorResponse, json } from "@/lib/http";
 import { buildDuplicateQuestionBankItemData, mapQuestionBankItem } from "@/lib/questionBank";
 import { requireProfessor } from "@/lib/serverSession";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireProfessor(request);
     const existing = await prisma.questionBankItem.findUniqueOrThrow({ where: { id: params.id } });
